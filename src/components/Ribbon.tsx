@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { LucideIcon } from 'lucide-react';
 import {
+  ArrowLeft,
   ArrowDown,
+  ArrowRight,
   ArrowUp,
   ArrowUpDown,
   Camera,
@@ -417,8 +419,8 @@ export function Ribbon({
             <RibbonButton icon={sortDirection === 'asc' ? ArrowUp : ArrowDown} label={sortDirection === 'asc' ? (ko ? '오름차순' : 'Ascending') : (ko ? '내림차순' : 'Descending')} onClick={() => onSortDirectionChange(sortDirection === 'asc' ? 'desc' : 'asc')} compact />
           </RibbonGroup>
           <RibbonGroup label={text.groups.explore}>
-            <RibbonButton icon={FolderUp} label={text.back} onClick={notifyUnavailable} compact />
-            <RibbonButton icon={FolderUp} label={text.forward} onClick={notifyUnavailable} compact />
+            <RibbonButton icon={ArrowLeft} label={text.back} onClick={notifyUnavailable} compact />
+            <RibbonButton icon={ArrowRight} label={text.forward} onClick={notifyUnavailable} compact />
             <RibbonButton icon={FolderUp} label={text.up} onClick={notifyUnavailable} compact />
             <RibbonButton icon={FolderOpen} label={text.documents} onClick={onOpenFolder} compact />
           </RibbonGroup>
