@@ -1,8 +1,10 @@
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const require = createRequire(import.meta.url);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const edition = String(process.argv[2] ?? '').trim().toLowerCase();
 if (!['community', 'pro'].includes(edition)) {
@@ -47,27 +49,22 @@ function run(command, args, env = {}) {
     env: { ...process.env, ...env },
     stdio: 'inherit',
     windowsHide: true,
-    shell: process.platform === 'win32' && /\.(?:cmd|bat)$/i.test(command),
   });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`${command} exited with code ${result.status ?? 1}`);
 }
 
 try {
-  const tsc = process.platform === 'win32'
-    ? path.join(root, 'node_modules', '.bin', 'tsc.cmd')
-    : path.join(root, 'node_modules', '.bin', 'tsc');
-  run(tsc, ['--noEmit'], { VITE_EDITION: edition, FASTIMAGE_EDITION: edition });
+  run(process.execPath, [require.resolve('typescript/bin/tsc'), '--noEmit'], {
+    VITE_EDITION: edition,
+    FASTIMAGE_EDITION: edition,
+  });
   run(process.execPath, [path.join(root, 'node_modules', 'vite', 'bin', 'vite.js'), 'build'], {
     VITE_EDITION: edition,
     FASTIMAGE_EDITION: edition,
   });
 
-  const electronBuilder = process.platform === 'win32'
-    ? path.join(root, 'node_modules', '.bin', 'electron-builder.cmd')
-    : path.join(root, 'node_modules', '.bin', 'electron-builder');
-  if (!existsSync(electronBuilder)) throw new Error(`electron-builder was not found at ${electronBuilder}`);
-  run(electronBuilder, ['--config', configPath, '--publish', 'never'], {
+  run(process.execPath, [require.resolve('electron-builder/cli'), '--config', configPath, '--publish', 'never'], {
     VITE_EDITION: edition,
     FASTIMAGE_EDITION: edition,
     ELECTRON_BUILDER_COMPRESSION_LEVEL: '1',
