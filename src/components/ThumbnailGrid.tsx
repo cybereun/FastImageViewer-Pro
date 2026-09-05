@@ -10,6 +10,14 @@ import { FilterBar, getFilterOptions, type DateFilter, type FormatFilter, type S
 import type { Language } from '../i18n';
 import { t } from '../i18n';
 
+export interface SelectionSummary {
+  count: number;
+  bytes: number;
+  width: number | null;
+  height: number | null;
+  mixedDimensions: boolean;
+}
+
 interface ThumbnailGridProps {
   images: ImageFile[];
   currentFolderPath: string | null;
@@ -28,6 +36,7 @@ interface ThumbnailGridProps {
     sortDirection: SortDirection;
   };
   onViewPreferencesChange?: (patch: Partial<ViewPreferences>) => void;
+  onSelectionChange?: (summary: SelectionSummary) => void;
   language?: Language;
 }
 
@@ -117,6 +126,7 @@ function ThumbnailItem({
   onDoubleClick,
   onContextMenu,
   onDragStart,
+  onImageLoad,
 }: {
   image: ImageFile;
   index: number;
@@ -129,6 +139,7 @@ function ThumbnailItem({
   onDoubleClick: (index: number) => void;
   onContextMenu: (e: React.MouseEvent, image: ImageFile) => void;
   onDragStart: (e: React.DragEvent, image: ImageFile) => void;
+  onImageLoad?: (image: ImageFile, width: number, height: number) => void;
 }) {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
@@ -229,7 +240,13 @@ function ThumbnailItem({
               'h-full w-full object-contain',
               !loaded && 'opacity-0'
             )}
-            onLoad={() => setLoaded(true)}
+            onLoad={(event) => {
+              setLoaded(true);
+              const { naturalWidth, naturalHeight } = event.currentTarget;
+              if ((!image.width || !image.height) && naturalWidth > 0 && naturalHeight > 0) {
+                onImageLoad?.(image, naturalWidth, naturalHeight);
+              }
+            }}
             onError={() => {
               if (generatedThumbnail && !thumbnailFailed) {
                 setThumbnailFailed(true);
@@ -269,6 +286,7 @@ export function ThumbnailGrid({
   confirmDelete,
   viewPreferences,
   onViewPreferencesChange,
+  onSelectionChange,
   language = 'en',
 }: ThumbnailGridProps) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -293,6 +311,7 @@ export function ThumbnailGrid({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [gridFocused, setGridFocused] = useState(false);
+  const [dimensionsById, setDimensionsById] = useState<Record<string, { width: number; height: number }>>({});
   const gridRef = useRef<HTMLDivElement | null>(null);
 
   const filtered = useMemo(() => filterAndSortImages(
@@ -310,6 +329,27 @@ export function ThumbnailGrid({
     () => filtered.filter((img) => selectedIds.has(img.id)),
     [filtered, selectedIds]
   );
+  const selectionSummary = useMemo<SelectionSummary>(() => {
+    const bytes = selectedImages.reduce((sum, image) => sum + (Number.isFinite(image.size) ? image.size : 0), 0);
+    const dimensions = selectedImages.map((image) => {
+      if (image.width && image.height) return { width: image.width, height: image.height };
+      const measured = dimensionsById[image.id];
+      if (measured) return measured;
+      return null;
+    });
+    const first = dimensions[0];
+    const allKnown = Boolean(first) && dimensions.every((dimension) => Boolean(dimension));
+    const sameDimensions = allKnown && dimensions.every((dimension) => (
+      dimension?.width === first?.width && dimension?.height === first?.height
+    ));
+    return {
+      count: selectedImages.length,
+      bytes,
+      width: sameDimensions ? first?.width ?? null : null,
+      height: sameDimensions ? first?.height ?? null : null,
+      mixedDimensions: allKnown && !sameDimensions,
+    };
+  }, [dimensionsById, selectedImages]);
   const activeIndex = activeId ? filtered.findIndex((image) => image.id === activeId) : -1;
   const activeImage = activeIndex >= 0 ? filtered[activeIndex] ?? null : null;
 
@@ -321,7 +361,20 @@ export function ThumbnailGrid({
     setSelectedIds(new Set());
     setActiveId(null);
     setAnchorId(null);
+    setDimensionsById({});
   }, [collectionKey]);
+
+  useEffect(() => {
+    onSelectionChange?.(selectionSummary);
+  }, [onSelectionChange, selectionSummary]);
+
+  const handleImageLoad = useCallback((image: ImageFile, width: number, height: number) => {
+    setDimensionsById((previous) => {
+      const current = previous[image.id];
+      if (current?.width === width && current.height === height) return previous;
+      return { ...previous, [image.id]: { width, height } };
+    });
+  }, []);
 
   useEffect(() => {
     if (!statusMessage) return;
@@ -986,6 +1039,7 @@ export function ThumbnailGrid({
               onDoubleClick={openImageByIndex}
               onContextMenu={handleContextMenu}
               onDragStart={handleDragStart}
+              onImageLoad={handleImageLoad}
             />
           ))}
         </div>

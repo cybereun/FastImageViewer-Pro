@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { nativeImage, shell } = require('electron');
+const sharp = require('sharp');
 const { createOrientedThumbnail } = require('./thumbnail');
 
 const SUPPORTED_EXTENSIONS = new Set([
@@ -54,6 +55,28 @@ async function statFile(filePath) {
     const stats = await fs.promises.stat(filePath);
     if (!stats.isFile()) throw new Error('The source path is not a file.');
     return stats;
+}
+
+async function readImageDimensions(filePath) {
+    try {
+        const extension = path.extname(filePath).toLowerCase();
+        if (['.bmp', '.ico'].includes(extension)) {
+            const image = nativeImage.createFromPath(filePath);
+            if (image.isEmpty()) return {};
+            const dimensions = image.getSize();
+            return dimensions.width > 0 && dimensions.height > 0
+                ? { width: dimensions.width, height: dimensions.height }
+                : {};
+        }
+        const metadata = await sharp(filePath).metadata();
+        if (!Number.isFinite(metadata.width) || !Number.isFinite(metadata.height)) return {};
+        const rotated = [5, 6, 7, 8].includes(metadata.orientation);
+        return rotated
+            ? { width: metadata.height, height: metadata.width }
+            : { width: metadata.width, height: metadata.height };
+    } catch {
+        return {};
+    }
 }
 
 async function ensureImageFile(filePath) {
@@ -124,12 +147,14 @@ async function readDirectory(dirPath) {
                     const filePath = path.join(resolved, dirent.name);
                     const stats = await fs.promises.stat(filePath);
                     const extension = path.extname(dirent.name).slice(1).toLowerCase();
+                    const dimensions = await readImageDimensions(filePath);
                     return {
                         name: dirent.name,
                         path: filePath,
                         size: stats.size,
                         lastModified: stats.mtimeMs,
                         type: MIME_TYPES[extension] || 'image/unknown',
+                        ...dimensions,
                     };
                 })
         );
@@ -150,12 +175,14 @@ async function readImageFiles(filePaths) {
             const source = await ensureImageFile(filePath);
             const stats = await fs.promises.stat(source);
             const extension = path.extname(path.basename(source)).slice(1).toLowerCase();
+            const dimensions = await readImageDimensions(source);
             files.push({
                 name: path.basename(source),
                 path: source,
                 size: stats.size,
                 lastModified: stats.mtimeMs,
                 type: MIME_TYPES[extension] || 'image/unknown',
+                ...dimensions,
             });
         } catch (error) {
             console.warn('Skipped invalid image file:', error.message);

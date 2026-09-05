@@ -11,14 +11,21 @@ export type FolderKind =
   | 'cdrom-drive'
   | 'network-drive'
   | 'ram-drive'
-  | 'unknown-drive';
+  | 'unknown-drive'
+  | 'virtual';
 
-export type SpecialFolderKind = 'desktop' | 'downloads' | 'documents' | 'pictures' | 'music' | 'videos';
+export type SpecialFolderKind = 'desktop' | 'downloads' | 'documents' | 'pictures' | 'music' | 'videos' | 'home' | 'user' | 'libraries';
+
+export type VirtualFolderKind = 'home' | 'gallery' | 'libraries' | 'this-pc';
 
 export interface StorageRoot {
+  id?: string;
   name: string;
   path: string;
   kind: FolderKind;
+  isVirtual?: boolean;
+  virtualKind?: VirtualFolderKind;
+  children?: StorageRoot[];
   specialKind?: SpecialFolderKind;
   driveLetter?: string;
   volumeLabel?: string | null;
@@ -51,12 +58,14 @@ export interface ImageFile {
 }
 
 export interface FolderNode {
-  id: string; // path
+  id: string; // path or shell namespace id for virtual nodes
   name: string;
-  path: string; // Absolute FS path
+  path: string; // Absolute FS path; virtual nodes use a shell namespace id
   children: FolderNode[];
   isLoaded: boolean;
   isExpanded: boolean;
+  isVirtual?: boolean;
+  virtualKind?: VirtualFolderKind;
   kind?: FolderKind;
   specialKind?: SpecialFolderKind;
   driveLetter?: string;
@@ -209,6 +218,8 @@ export interface DirectoryContent {
     size: number;
     lastModified: number;
     type: string;
+    width?: number;
+    height?: number;
   }>;
   folders: Array<{
     name: string;

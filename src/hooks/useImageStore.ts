@@ -50,15 +50,25 @@ function samePath(left: string | null, right: string | null): boolean {
 }
 
 function mapStorageRoot(root: StorageRoot, previous?: FolderNode): FolderNode {
+  const id = root.id ?? root.path;
+  const isVirtual = Boolean(root.isVirtual || root.kind === 'virtual');
+  const children = root.children
+    ? root.children.map((child) => {
+        const childId = child.id ?? child.path;
+        const previousChild = previous?.children.find((node) => samePath(node.id, childId));
+        return mapStorageRoot(child, previousChild);
+      })
+    : previous?.children ?? [];
   return {
-    ...(previous ?? {
-      children: [],
-      isLoaded: false,
-      isExpanded: false,
-    }),
-    id: root.path,
+    ...previous,
+    id,
     name: root.name,
     path: root.path,
+    children,
+    isLoaded: isVirtual ? true : previous?.isLoaded ?? false,
+    isExpanded: isVirtual ? previous?.isExpanded ?? true : previous?.isExpanded ?? false,
+    isVirtual: root.isVirtual,
+    virtualKind: root.virtualKind,
     kind: root.kind,
     specialKind: root.specialKind,
     driveLetter: root.driveLetter,
@@ -67,6 +77,13 @@ function mapStorageRoot(root: StorageRoot, previous?: FolderNode): FolderNode {
     freeBytes: root.freeBytes,
     providerName: root.providerName,
   };
+}
+
+function flattenStorageRoots(roots: StorageRoot[]): StorageRoot[] {
+  return roots.flatMap((root) => [
+    ...(root.isVirtual || root.kind === 'virtual' ? [] : [root]),
+    ...(root.children ? flattenStorageRoots(root.children) : []),
+  ]);
 }
 
 export function useImageStore() {
@@ -197,12 +214,13 @@ export function useImageStore() {
       const roots = await window.electron.getInitialRoots();
       if (!Array.isArray(roots)) return;
       setRootFolders((previous) => {
-        const rootPaths = new Set(roots.map((root) => root.path.toLowerCase()));
+        const rootPaths = new Set(roots.map((root) => (root.id ?? root.path).toLowerCase()));
         const refreshedRoots = roots.map((root) => {
-          const existing = previous.find((node) => samePath(node.path, root.path));
+          const rootId = root.id ?? root.path;
+          const existing = previous.find((node) => samePath(node.id, rootId));
           return mapStorageRoot(root, existing);
         });
-        const openedFolders = previous.filter((node) => !rootPaths.has(node.path.toLowerCase()));
+        const openedFolders = previous.filter((node) => !rootPaths.has(node.id.toLowerCase()));
         return [...refreshedRoots, ...openedFolders];
       });
     } catch {
@@ -240,14 +258,18 @@ export function useImageStore() {
         const rootNodes: FolderNode[] = roots.map((root) => mapStorageRoot(root));
         setRootFolders(rootNodes);
 
-        const preferredPath = loadedPreferences.defaultFolder && roots.some((root) => samePath(root.path, loadedPreferences.defaultFolder))
-          ? loadedPreferences.defaultFolder
-          : roots.find((root) => root.name.toLowerCase() === 'pictures')?.path
-            ?? roots.find((root) => root.name.toLowerCase() === 'downloads')?.path
-            ?? roots[0]?.path;
+        const selectableRoots = flattenStorageRoots(roots).filter((root) => typeof root.path === 'string');
+        const preferredRoot = loadedPreferences.defaultFolder
+          ? selectableRoots.find((root) => samePath(root.path, loadedPreferences.defaultFolder))
+          : undefined;
+        const fallbackRoot = selectableRoots.find((root) => root.specialKind === 'pictures')
+          ?? selectableRoots.find((root) => root.specialKind === 'downloads')
+          ?? selectableRoots.find((root) => root.specialKind === 'user')
+          ?? selectableRoots[0];
+        const preferredPath = preferredRoot?.path ?? fallbackRoot?.path;
         if (!preferredPath) return;
 
-        const preferredNode = rootNodes.find((node) => samePath(node.path, preferredPath));
+        const preferredNode = findNodeById(rootNodes, preferredPath);
         const content = await window.electron.readDirectory(preferredPath);
         if (cancelled) return;
         const images = mapImages(content, loadedPreferences.imageMetadata, window.electron.toLocalUrl);
@@ -392,6 +414,7 @@ export function useImageStore() {
       }
       const node = findNodeById(rootFoldersRef.current, nodeId);
       if (!node) return;
+      if (node.isVirtual) return;
 
       selectedFolderRef.current = node.path;
       setSelectedFolderId(node.path);
@@ -409,6 +432,10 @@ export function useImageStore() {
     async (node: FolderNode) => {
       if (node.isExpanded) {
         setRootFolders((previous) => updateNodeTree(previous, node.id, (target) => ({ ...target, isExpanded: false })));
+        return;
+      }
+      if (node.isVirtual) {
+        setRootFolders((previous) => updateNodeTree(previous, node.id, (target) => ({ ...target, isExpanded: true })));
         return;
       }
       await refreshFolderContent(node.path, true);

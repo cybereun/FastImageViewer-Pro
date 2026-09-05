@@ -21,7 +21,7 @@ const {
 const { loadPreferences, savePreferences } = require('./preferences');
 const { createUpdateManager } = require('./update-service');
 const { detectEdition } = require('./edition');
-const { normalizeStorageRoot } = require('./storage');
+const { mergeStorageRoot, normalizeStorageRoot } = require('./storage');
 
 const execFileAsync = promisify(execFile);
 
@@ -219,21 +219,7 @@ ipcMain.handle('fs:batchFileOperation', async (_event, operation, sourcePaths, t
 ));
 ipcMain.handle('fs:batchRenameImages', async (_event, renames) => batchRenameImageFiles(renames));
 
-async function queryWindowsDrives() {
-    if (process.platform !== 'win32') return [];
-
-    // Win32_LogicalDisk exposes the information Explorer uses for fixed,
-    // removable, optical and network volumes.  Keep this query best-effort:
-    // a restricted PowerShell policy must not prevent the app from showing
-    // the normal known folders and locally discoverable drive letters.
-    const command = [
-        '$ErrorActionPreference = "Stop"',
-        'Get-CimInstance -ClassName Win32_LogicalDisk',
-        '| Where-Object { $_.DriveType -in 2,3,4,5,6 }',
-        '| Select-Object DeviceID,VolumeName,DriveType,Size,FreeSpace,ProviderName',
-        '| ConvertTo-Json -Compress',
-    ].join(' ');
-
+async function queryPowerShellJson(command) {
     try {
         const result = await execFileAsync('powershell.exe', [
             '-NoLogo',
@@ -251,24 +237,50 @@ async function queryWindowsDrives() {
         const text = String(result.stdout ?? '').trim();
         if (!text) return [];
         const parsed = JSON.parse(text);
-        const records = Array.isArray(parsed) ? parsed : [parsed];
-        return records.map(normalizeStorageRoot).filter(Boolean);
+        return Array.isArray(parsed) ? parsed : [parsed];
     } catch (error) {
-        console.warn('Windows drive metadata query failed:', error.message);
+        console.warn('Windows storage metadata query failed:', error.message);
         return [];
     }
 }
 
-async function getStorageRoots() {
-    const roots = [];
-    const pushUnique = (root) => {
-        if (!root || typeof root.path !== 'string') return;
-        const normalized = path.resolve(root.path);
-        if (!fs.existsSync(normalized)) return;
-        if (roots.some((item) => item.path.toLowerCase() === normalized.toLowerCase())) return;
-        roots.push({ ...root, path: normalized });
-    };
+async function queryWindowsDrives() {
+    if (process.platform !== 'win32') return [];
 
+    // Win32_LogicalDisk includes drives even when an optical disk has no
+    // media. Get-Volume supplies the user-facing volume label for devices
+    // where the WMI label is empty, so both results are merged by letter.
+    const logicalDiskCommand = [
+        '$ErrorActionPreference = "Stop"',
+        'Get-CimInstance -ClassName Win32_LogicalDisk',
+        '| Where-Object { $_.DriveType -in 2,3,4,5,6 }',
+        '| Select-Object DeviceID,VolumeName,DriveType,Size,FreeSpace,ProviderName',
+        '| ConvertTo-Json -Compress',
+    ].join(' ');
+    const volumeCommand = [
+        '$ErrorActionPreference = "Stop"',
+        'Get-Volume',
+        '| Where-Object { $_.DriveLetter }',
+        '| Select-Object DriveLetter,FileSystemLabel,DriveType,Size,SizeRemaining',
+        '| ConvertTo-Json -Compress',
+    ].join(' ');
+
+    const [logicalRecords, volumeRecords] = await Promise.all([
+        queryPowerShellJson(logicalDiskCommand),
+        queryPowerShellJson(volumeCommand),
+    ]);
+    const byLetter = new Map();
+    logicalRecords.map(normalizeStorageRoot).filter(Boolean).forEach((root) => {
+        byLetter.set(root.driveLetter.toLowerCase(), root);
+    });
+    volumeRecords.map(normalizeStorageRoot).filter(Boolean).forEach((root) => {
+        const key = root.driveLetter.toLowerCase();
+        byLetter.set(key, byLetter.has(key) ? mergeStorageRoot(byLetter.get(key), root) : root);
+    });
+    return [...byLetter.values()];
+}
+
+function createKnownFolderRoots() {
     const knownFolders = [
         { name: 'Desktop', path: app.getPath('desktop'), specialKind: 'desktop' },
         { name: 'Downloads', path: app.getPath('downloads'), specialKind: 'downloads' },
@@ -277,34 +289,94 @@ async function getStorageRoots() {
         { name: 'Music', path: app.getPath('music'), specialKind: 'music' },
         { name: 'Videos', path: app.getPath('videos'), specialKind: 'videos' },
     ];
-    knownFolders.forEach((folder) => pushUnique({ ...folder, kind: 'special' }));
+    return knownFolders
+        .map((folder) => ({ ...folder, kind: 'special' }))
+        .filter((folder) => typeof folder.path === 'string' && fs.existsSync(folder.path));
+}
 
-    const queriedDrives = await queryWindowsDrives();
-    queriedDrives.forEach(pushUnique);
+function createDriveRoots(queriedDrives) {
+    const roots = [];
+    const seen = new Set();
+    const pushUnique = (root, allowMissing = false) => {
+        if (!root || typeof root.path !== 'string') return;
+        const normalized = path.resolve(root.path);
+        if (!allowMissing && !fs.existsSync(normalized)) return;
+        const key = normalized.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        roots.push({ ...root, path: normalized });
+    };
 
-    // PowerShell can be unavailable on a locked-down machine.  Preserve the
-    // previous drive enumeration as a safe fallback, using a fixed-drive icon
-    // when the type cannot be determined.
+    queriedDrives.forEach((root) => pushUnique(root, true));
+
+    // PowerShell can be unavailable on a locked-down machine. Preserve the
+    // previous drive enumeration as a safe fallback. Query results are kept
+    // even when a removable or optical volume is temporarily unavailable.
     if (process.platform === 'win32') {
         for (let code = 65; code <= 90; code += 1) {
             const letter = String.fromCharCode(code);
             const drivePath = `${letter}:\\`;
-            if (fs.existsSync(drivePath)) {
-                pushUnique({
-                    name: `${letter}:`,
-                    path: drivePath,
-                    kind: 'fixed-drive',
-                    driveLetter: `${letter}:`,
-                    volumeLabel: null,
-                    totalBytes: null,
-                    freeBytes: null,
-                    providerName: null,
-                });
-            }
+            if (!fs.existsSync(drivePath)) continue;
+            const fallback = normalizeStorageRoot({ DeviceID: `${letter}:`, DriveType: 3 });
+            if (fallback) pushUnique(fallback);
         }
     }
-
     return roots;
+}
+
+async function getStorageRoots() {
+    const knownFolderRoots = createKnownFolderRoots();
+    const driveRoots = createDriveRoots(await queryWindowsDrives());
+    const homePath = app.getPath('home');
+    const userName = path.basename(homePath) || 'User';
+    const userRoot = {
+        name: userName,
+        path: homePath,
+        kind: 'special',
+        specialKind: 'user',
+    };
+    const picturesRoot = knownFolderRoots.find((root) => root.specialKind === 'pictures');
+
+    // Keep shell-like roots in the renderer tree. Their children are real
+    // filesystem paths, while the parents are navigation containers and are
+    // never sent to readDirectory.
+    const homeRoot = {
+        id: 'shell:home',
+        name: 'Home',
+        path: 'shell:home',
+        kind: 'virtual',
+        isVirtual: true,
+        virtualKind: 'home',
+        children: [userRoot],
+    };
+    const galleryRoot = {
+        id: 'shell:gallery',
+        name: 'Gallery',
+        path: 'shell:gallery',
+        kind: 'virtual',
+        isVirtual: true,
+        virtualKind: 'gallery',
+        children: picturesRoot ? [picturesRoot] : [],
+    };
+    const librariesRoot = {
+        id: 'shell:libraries',
+        name: 'Libraries',
+        path: 'shell:libraries',
+        kind: 'virtual',
+        isVirtual: true,
+        virtualKind: 'libraries',
+        children: knownFolderRoots,
+    };
+    const thisPcRoot = {
+        id: 'shell:this-pc',
+        name: 'This PC',
+        path: 'shell:this-pc',
+        kind: 'virtual',
+        isVirtual: true,
+        virtualKind: 'this-pc',
+        children: driveRoots,
+    };
+    return [homeRoot, galleryRoot, librariesRoot, thisPcRoot];
 }
 
 ipcMain.handle('fs:getInitialRoots', async () => getStorageRoots());

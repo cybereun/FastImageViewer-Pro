@@ -88,6 +88,8 @@ export function mapImages(
       size: file.size,
       lastModified: file.lastModified,
       type: file.type || 'image/unknown',
+      width: file.width,
+      height: file.height,
       source: 'folder' as const,
       metadata: getMetadataForImage(file.path, metadata),
     }))

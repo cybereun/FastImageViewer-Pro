@@ -20,13 +20,13 @@ import {
   Usb,
   Video,
 } from 'lucide-react';
-import type { FolderKind, FolderNode, SpecialFolderKind } from '../types';
+import type { FolderKind, FolderNode, SpecialFolderKind, VirtualFolderKind } from '../types';
 import { cn } from '../utils/cn';
 import { IMAGE_DRAG_MIME } from '../constants/drag';
 import type { Language } from '../i18n';
 import { t } from '../i18n';
 
-const SPECIAL_FOLDER_LABELS: Record<Language, Record<SpecialFolderKind, string>> = {
+const SPECIAL_FOLDER_LABELS: Record<Language, Partial<Record<SpecialFolderKind, string>>> = {
   ko: {
     desktop: '바탕 화면',
     downloads: '다운로드',
@@ -43,6 +43,11 @@ const SPECIAL_FOLDER_LABELS: Record<Language, Record<SpecialFolderKind, string>>
     music: 'Music',
     videos: 'Videos',
   },
+};
+
+const VIRTUAL_FOLDER_LABELS: Record<Language, Record<VirtualFolderKind, string>> = {
+  ko: { home: '홈', gallery: '갤러리', libraries: '라이브러리', 'this-pc': '내 PC' },
+  en: { home: 'Home', gallery: 'Gallery', libraries: 'Libraries', 'this-pc': 'This PC' },
 };
 
 function isDriveKind(kind: FolderKind | undefined): boolean {
@@ -63,7 +68,11 @@ function formatBytes(value: number | null | undefined): string {
 }
 
 function getNodeLabel(node: FolderNode, language: Language): string {
-  if (node.specialKind) return SPECIAL_FOLDER_LABELS[language][node.specialKind];
+  if (node.virtualKind) return VIRTUAL_FOLDER_LABELS[language][node.virtualKind];
+  if (node.specialKind) return SPECIAL_FOLDER_LABELS[language][node.specialKind] ?? node.name;
+  if (isDriveKind(node.kind) && node.volumeLabel && node.driveLetter) {
+    return `${node.volumeLabel} (${node.driveLetter})`;
+  }
   return node.name;
 }
 
@@ -81,6 +90,10 @@ function getNodeDescription(node: FolderNode, language: Language): string | null
 function FolderGlyph({ node, isSelected }: { node: FolderNode; isSelected: boolean }) {
   const className = isSelected ? 'text-white' : undefined;
   const size = 17;
+  if (node.virtualKind === 'home') return <Home size={size} className={className ?? 'text-orange-400'} />;
+  if (node.virtualKind === 'gallery') return <Image size={size} className={className ?? 'text-cyan-400'} />;
+  if (node.virtualKind === 'libraries') return <Folder size={size} className={className ?? 'text-yellow-500'} />;
+  if (node.virtualKind === 'this-pc') return <Computer size={size} className={className ?? 'text-sky-500'} />;
   if (node.kind === 'fixed-drive' || node.kind === 'unknown-drive') return <HardDrive size={size} className={className ?? 'text-sky-500'} />;
   if (node.kind === 'removable-drive') return <Usb size={size} className={className ?? 'text-violet-500'} />;
   if (node.kind === 'cdrom-drive') return <Disc3 size={size} className={className ?? 'text-amber-500'} />;
@@ -92,7 +105,6 @@ function FolderGlyph({ node, isSelected }: { node: FolderNode; isSelected: boole
   if (node.specialKind === 'pictures') return <Image size={size} className={className ?? 'text-cyan-400'} />;
   if (node.specialKind === 'music') return <Music size={size} className={className ?? 'text-fuchsia-400'} />;
   if (node.specialKind === 'videos') return <Video size={size} className={className ?? 'text-red-400'} />;
-  if (node.name.toLowerCase() === 'home') return <Home size={size} className={className ?? 'text-orange-400'} />;
   return node.isExpanded
     ? <FolderOpen size={size} className={className ?? 'text-yellow-500'} />
     : <Folder size={size} className={className ?? 'text-yellow-500'} />;
@@ -138,8 +150,8 @@ function FolderItem({
   }) => Promise<void> | void;
   language: Language;
 }) {
-  const isSelected = selectedFolder === node.id;
-  const canToggle = node.children.length > 0 || !node.isLoaded;
+  const isSelected = !node.isVirtual && selectedFolder === node.id;
+  const canToggle = node.isVirtual ? node.children.length > 0 : node.children.length > 0 || !node.isLoaded;
   const [dropActive, setDropActive] = useState(false);
   const label = getNodeLabel(node, language);
   const description = getNodeDescription(node, language);
@@ -156,6 +168,7 @@ function FolderItem({
     Array.from(e.dataTransfer.types).includes(IMAGE_DRAG_MIME);
 
   const handleDragOver = (e: React.DragEvent) => {
+    if (node.isVirtual) return;
     if (!hasImagePayload(e)) return;
     e.preventDefault();
     e.stopPropagation();
@@ -164,12 +177,14 @@ function FolderItem({
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
+    if (node.isVirtual) return;
     e.preventDefault();
     e.stopPropagation();
     setDropActive(false);
   };
 
   const handleImageDrop = async (e: React.DragEvent) => {
+    if (node.isVirtual) return;
     if (!hasImagePayload(e)) return;
     e.preventDefault();
     e.stopPropagation();
@@ -202,7 +217,14 @@ function FolderItem({
           dropActive && 'bg-blue-500/25 ring-1 ring-blue-400'
         )}
         style={{ paddingLeft: `${depth * 16 + 4}px` }}
-        onClick={() => onSelectFolder(node.id)}
+        onClick={(event) => {
+          if (node.isVirtual) {
+            event.stopPropagation();
+            if (canToggle && onToggleFolder) onToggleFolder(node);
+            return;
+          }
+          onSelectFolder(node.id);
+        }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleImageDrop}

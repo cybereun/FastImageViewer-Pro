@@ -16,7 +16,7 @@ import { ImageViewer } from './components/ImageViewer';
 import { SettingsModal } from './components/SettingsModal';
 import { StatusFooter } from './components/StatusFooter';
 import { Toast } from './components/Toast';
-import { ThumbnailGrid } from './components/ThumbnailGrid';
+import { ThumbnailGrid, type SelectionSummary } from './components/ThumbnailGrid';
 import { UpdateDialog } from './components/UpdateDialog';
 import { useImageStore } from './hooks/useImageStore';
 import { BUILD_EDITION, getEditionLabel } from './application/edition';
@@ -65,6 +65,17 @@ export function App() {
   const [updateProgress, setUpdateProgress] = useState<UpdateDownloadProgress | null>(null);
   const [updateAction, setUpdateAction] = useState<'idle' | 'downloading' | 'installing' | 'error'>('idle');
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [selection, setSelection] = useState<SelectionSummary>({
+    count: 0,
+    bytes: 0,
+    width: null,
+    height: null,
+    mixedDimensions: false,
+  });
+
+  useEffect(() => {
+    setSelection({ count: 0, bytes: 0, width: null, height: null, mixedDimensions: false });
+  }, [collectionKind, selectedFolder]);
 
   useEffect(() => {
     let active = true;
@@ -159,6 +170,10 @@ export function App() {
   }, []);
 
   const handleCloseViewer = useCallback(() => setViewerOpen(false), []);
+
+  const handleSelectionChange = useCallback((summary: SelectionSummary) => {
+    setSelection(summary);
+  }, []);
 
   const handleSidebarToggle = useCallback(() => {
     setSidebarOpen((previous) => {
@@ -373,6 +388,7 @@ export function App() {
               onUpdateImageMetadata={updateImageMetadata}
               viewPreferences={viewPreferences}
               onViewPreferencesChange={updatePreferences}
+              onSelectionChange={handleSelectionChange}
               language={preferences.language}
             />
           )}
@@ -386,6 +402,7 @@ export function App() {
         language={preferences.language}
         appVersion={appVersion}
         onVersionClick={() => setAboutOpen(true)}
+        selection={selection}
       />
 
       {viewerOpen && viewerImages.length > 0 && (

@@ -5,6 +5,7 @@ const require = createRequire(import.meta.url);
 const {
   classifyDriveType,
   displayDriveName,
+  mergeStorageRoot,
   normalizeStorageRoot,
   specialFolderKind,
   isDrivePath,
@@ -17,6 +18,8 @@ describe('storage metadata', () => {
     expect(classifyDriveType(4)).toBe('network-drive');
     expect(classifyDriveType(5)).toBe('cdrom-drive');
     expect(classifyDriveType(6)).toBe('ram-drive');
+    expect(classifyDriveType('Fixed')).toBe('fixed-drive');
+    expect(classifyDriveType('CD-ROM')).toBe('cdrom-drive');
     expect(classifyDriveType(99)).toBe('unknown-drive');
   });
 
@@ -39,6 +42,15 @@ describe('storage metadata', () => {
       providerName: null,
     });
     expect(displayDriveName('Z:', '', '\\\\server\\share')).toBe('\\\\server\\share (Z:)');
+    expect(normalizeStorageRoot({ DeviceID: 'c:', DriveType: 3, Size: 100, FreeSpace: 10 }).name).toBe('Local Disk (C:)');
+    const logical = normalizeStorageRoot({ DeviceID: 'l:', DriveType: 3 });
+    const volume = normalizeStorageRoot({ DriveLetter: 'L', FileSystemLabel: 'SM1-500G', DriveType: 'Fixed' });
+    expect(mergeStorageRoot(logical, volume)).toMatchObject({
+      name: 'SM1-500G (L:)',
+      driveLetter: 'L:',
+      volumeLabel: 'SM1-500G',
+      kind: 'fixed-drive',
+    });
   });
 
   it('recognizes special folders and drive roots', () => {
