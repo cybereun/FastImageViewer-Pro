@@ -18,6 +18,14 @@ export interface SelectionSummary {
   mixedDimensions: boolean;
 }
 
+const EMPTY_SELECTION: SelectionSummary = {
+  count: 0,
+  bytes: 0,
+  width: null,
+  height: null,
+  mixedDimensions: false,
+};
+
 interface ThumbnailGridProps {
   images: ImageFile[];
   currentFolderPath: string | null;
@@ -362,7 +370,9 @@ export function ThumbnailGrid({
     setActiveId(null);
     setAnchorId(null);
     setDimensionsById({});
-  }, [collectionKey]);
+    onSelectionChange?.(EMPTY_SELECTION);
+    return () => onSelectionChange?.(EMPTY_SELECTION);
+  }, [collectionKey, onSelectionChange]);
 
   useEffect(() => {
     onSelectionChange?.(selectionSummary);

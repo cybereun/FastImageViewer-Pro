@@ -74,10 +74,6 @@ export function App() {
   });
 
   useEffect(() => {
-    setSelection({ count: 0, bytes: 0, width: null, height: null, mixedDimensions: false });
-  }, [collectionKind, selectedFolder]);
-
-  useEffect(() => {
     let active = true;
     void window.electron.rendererReady().catch(() => undefined);
     const poll = async () => {
