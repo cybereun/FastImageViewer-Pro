@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   FolderOpen,
@@ -36,6 +36,11 @@ function getParentFolderPath(folderPath: string | null): string | null {
   if (separator < 0) return null;
   if (separator === 2 && /^[A-Za-z]:/.test(trimmed)) return `${trimmed.slice(0, 2)}\\`;
   return trimmed.slice(0, separator) || null;
+}
+
+function samePath(left: string | null, right: string | null): boolean {
+  if (!left || !right) return left === right;
+  return left.toLowerCase() === right.toLowerCase();
 }
 
 function ChromeAction({
@@ -99,6 +104,11 @@ export function App() {
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerImages, setViewerImages] = useState<ImageFile[]>([]);
   const [viewerIndex, setViewerIndex] = useState(0);
+  const [viewerSlideshow, setViewerSlideshow] = useState(false);
+  const [activeImage, setActiveImage] = useState<ImageFile | null>(null);
+  const [folderHistory, setFolderHistory] = useState<{ back: string[]; forward: string[] }>({ back: [], forward: [] });
+  const previousFolderRef = useRef<string | null>(selectedFolder);
+  const historyNavigationRef = useRef<'back' | 'forward' | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(preferences.sidebarOpen);
   const [isMaximized, setIsMaximized] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
@@ -198,6 +208,20 @@ export function App() {
   }, [viewerImages.length, viewerOpen]);
 
   useEffect(() => {
+    const previous = previousFolderRef.current;
+    if (samePath(previous, selectedFolder)) return;
+    const historyAction = historyNavigationRef.current;
+    historyNavigationRef.current = null;
+    if (!historyAction && previous) {
+      setFolderHistory((current) => ({
+        back: [...current.back.filter((path) => !samePath(path, previous)), previous].slice(-40),
+        forward: [],
+      }));
+    }
+    previousFolderRef.current = selectedFolder;
+  }, [selectedFolder]);
+
+  useEffect(() => {
     if (viewerImages.length === 0) return;
     setViewerImages((previous) => previous
       .filter((image) => images.some((candidate) => candidate.id === image.id))
@@ -208,10 +232,21 @@ export function App() {
   const handleImageClick = useCallback((index: number, collection: ImageFile[]) => {
     setViewerImages(collection);
     setViewerIndex(index);
+    setViewerSlideshow(false);
     setViewerOpen(true);
   }, []);
 
-  const handleCloseViewer = useCallback(() => setViewerOpen(false), []);
+  const handleStartSlideshow = useCallback((index: number, collection: ImageFile[]) => {
+    setViewerImages(collection);
+    setViewerIndex(index);
+    setViewerSlideshow(true);
+    setViewerOpen(true);
+  }, []);
+
+  const handleCloseViewer = useCallback(() => {
+    setViewerOpen(false);
+    setViewerSlideshow(false);
+  }, []);
 
   const handleSelectionChange = useCallback((summary: SelectionSummary) => {
     setSelection(summary);
@@ -225,9 +260,79 @@ export function App() {
     });
   }, [updatePreferences]);
 
-  const handleUnavailableCommand = useCallback(() => {
-    setNotice(preferences.language === 'ko' ? '이 기능은 아직 준비 중입니다.' : 'This command is not available yet.');
-  }, [preferences.language]);
+  const handleSaveAs = useCallback(() => {
+    if (!activeImage) {
+      setNotice(preferences.language === 'ko' ? '이미지를 먼저 선택하세요.' : 'Select an image first.');
+      return;
+    }
+    const anchor = document.createElement('a');
+    anchor.href = activeImage.url;
+    anchor.download = activeImage.name;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setNotice(preferences.language === 'ko' ? '이미지를 저장했습니다.' : 'Image saved.');
+  }, [activeImage, preferences.language]);
+
+  const handlePrint = useCallback(() => {
+    if (!activeImage) {
+      setNotice(preferences.language === 'ko' ? '이미지를 먼저 선택하세요.' : 'Select an image first.');
+      return;
+    }
+    const printWindow = window.open('', '_blank', 'width=1000,height=800');
+    if (!printWindow) {
+      setNotice(preferences.language === 'ko' ? '인쇄 창을 열려면 팝업을 허용하세요.' : 'Allow pop-ups to print the image.');
+      return;
+    }
+    const documentRef = printWindow.document;
+    documentRef.title = activeImage.name;
+    documentRef.body.style.cssText = 'margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#fff;';
+    const image = documentRef.createElement('img');
+    image.src = activeImage.url;
+    image.alt = activeImage.name;
+    image.style.cssText = 'max-width:100%;max-height:100%;object-fit:contain;';
+    image.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+      printWindow.onafterprint = () => printWindow.close();
+    };
+    documentRef.body.appendChild(image);
+    setNotice(preferences.language === 'ko' ? '인쇄 창을 열었습니다.' : 'Print window opened.');
+  }, [activeImage, preferences.language]);
+
+  const handleNavigateBack = useCallback(async () => {
+    const target = folderHistory.back[folderHistory.back.length - 1];
+    if (!target) return;
+    const current = selectedFolder;
+    setFolderHistory((history) => ({
+      back: history.back.slice(0, -1),
+      forward: current && !history.forward.some((path) => samePath(path, current)) ? [...history.forward, current] : history.forward,
+    }));
+    historyNavigationRef.current = 'back';
+    try {
+      await openFolderPath(target);
+    } catch (navigateError) {
+      historyNavigationRef.current = null;
+      setNotice(navigateError instanceof Error ? navigateError.message : (preferences.language === 'ko' ? '이전 폴더를 열지 못했습니다.' : 'Unable to open the previous folder.'));
+    }
+  }, [folderHistory.back, openFolderPath, preferences.language, selectedFolder]);
+
+  const handleNavigateForward = useCallback(async () => {
+    const target = folderHistory.forward[folderHistory.forward.length - 1];
+    if (!target) return;
+    const current = selectedFolder;
+    setFolderHistory((history) => ({
+      back: current && !history.back.some((path) => samePath(path, current)) ? [...history.back, current] : history.back,
+      forward: history.forward.slice(0, -1),
+    }));
+    historyNavigationRef.current = 'forward';
+    try {
+      await openFolderPath(target);
+    } catch (navigateError) {
+      historyNavigationRef.current = null;
+      setNotice(navigateError instanceof Error ? navigateError.message : (preferences.language === 'ko' ? '다음 폴더를 열지 못했습니다.' : 'Unable to open the next folder.'));
+    }
+  }, [folderHistory.forward, openFolderPath, preferences.language, selectedFolder]);
 
   const handleNewFolder = useCallback(async () => {
     if (!selectedFolder) {
@@ -370,12 +475,14 @@ export function App() {
           <ChromeAction
             icon={Save}
             label={preferences.language === 'ko' ? '다른 이름으로 저장' : 'Save as'}
-            onClick={handleUnavailableCommand}
+            onClick={handleSaveAs}
+            disabled={!activeImage}
           />
           <ChromeAction
             icon={Printer}
             label={preferences.language === 'ko' ? '인쇄' : 'Print'}
-            onClick={handleUnavailableCommand}
+            onClick={handlePrint}
+            disabled={!activeImage}
           />
         </div>
 
@@ -495,6 +602,12 @@ export function App() {
                 onCheckForUpdates={() => void handleCheckForUpdates()}
                 onClose={() => window.electron.closeWindow()}
                 onNavigateUp={() => void handleNavigateUp()}
+                onNavigateBack={() => void handleNavigateBack()}
+                onNavigateForward={() => void handleNavigateForward()}
+                canNavigateBack={folderHistory.back.length > 0}
+                canNavigateForward={folderHistory.forward.length > 0}
+                onStartSlideshow={handleStartSlideshow}
+                onActiveImageChange={setActiveImage}
                 language={preferences.language}
               />
             )}
@@ -518,6 +631,7 @@ export function App() {
           onClose={handleCloseViewer}
           onIndexChange={setViewerIndex}
           wheelNavigation={preferences.wheelNavigation}
+          autoPlay={viewerSlideshow}
           onUpdateImageMetadata={updateImageMetadata}
         />
       )}

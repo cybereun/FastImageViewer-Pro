@@ -314,6 +314,11 @@ async function batchRenameImageFiles(renames) {
     return result;
 }
 
+async function readImageData(sourcePath) {
+    const source = await ensureImageFile(sourcePath);
+    return fs.promises.readFile(source);
+}
+
 const BATCH_IMAGE_FORMATS = new Set(['original', 'jpeg', 'png', 'webp']);
 const BATCH_ROTATIONS = new Set([0, 90, 180, 270]);
 
@@ -485,6 +490,7 @@ module.exports = {
     renameImageFile,
     deleteImageFile,
     overwriteImageFile,
+    readImageData,
     batchFileOperation,
     batchRenameImageFiles,
     batchEditImages,

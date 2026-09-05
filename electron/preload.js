@@ -59,6 +59,7 @@ contextBridge.exposeInMainWorld('electron', {
         ipcRenderer.invoke('fs:renameImageFile', sourcePath, nextName),
     deleteImageFile: (sourcePath) => ipcRenderer.invoke('fs:deleteImageFile', sourcePath),
     overwriteImageFile: (sourcePath, bytes) => ipcRenderer.invoke('fs:overwriteImageFile', sourcePath, bytes),
+    readImageData: (sourcePath) => ipcRenderer.invoke('fs:readImageData', sourcePath),
     batchFileOperation: (operation, sourcePaths, targetFolderPath) =>
         ipcRenderer.invoke('fs:batchFileOperation', operation, sourcePaths, targetFolderPath),
     batchRenameImages: (renames) => ipcRenderer.invoke('fs:batchRenameImages', renames),

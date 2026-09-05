@@ -15,6 +15,7 @@ const {
     renameImageFile,
     deleteImageFile,
     overwriteImageFile,
+    readImageData,
     batchFileOperation,
     batchRenameImageFiles,
     batchEditImages,
@@ -241,6 +242,7 @@ ipcMain.handle('fs:moveImageFile', async (_event, sourcePath, targetFolderPath) 
 ipcMain.handle('fs:renameImageFile', async (_event, sourcePath, nextName) => renameImageFile(sourcePath, nextName));
 ipcMain.handle('fs:deleteImageFile', async (_event, sourcePath) => deleteImageFile(sourcePath));
 ipcMain.handle('fs:overwriteImageFile', async (_event, sourcePath, bytes) => overwriteImageFile(sourcePath, bytes));
+ipcMain.handle('fs:readImageData', async (_event, sourcePath) => readImageData(sourcePath));
 ipcMain.handle('fs:batchFileOperation', async (_event, operation, sourcePaths, targetFolderPath) => (
     batchFileOperation(operation, sourcePaths, targetFolderPath)
 ));

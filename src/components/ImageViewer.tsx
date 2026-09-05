@@ -29,6 +29,7 @@ interface ImageViewerProps {
   onClose: () => void;
   onIndexChange: (index: number) => void;
   wheelNavigation?: boolean;
+  autoPlay?: boolean;
   onUpdateImageMetadata?: (imageId: string, patch: Partial<ImageMetadata>) => void;
 }
 
@@ -44,6 +45,7 @@ export function ImageViewer({
   onClose,
   onIndexChange,
   wheelNavigation = true,
+  autoPlay = false,
   onUpdateImageMetadata,
 }: ImageViewerProps) {
   const [zoom, setZoom] = useState(1);
@@ -62,6 +64,10 @@ export function ImageViewer({
   const imageStageRef = useRef<HTMLDivElement | null>(null);
 
   const currentImage = images[currentIndex];
+
+  useEffect(() => {
+    setSlideshow(autoPlay);
+  }, [autoPlay]);
 
   const isEditableElement = (target: EventTarget | null) => {
     if (!(target instanceof HTMLElement)) return false;

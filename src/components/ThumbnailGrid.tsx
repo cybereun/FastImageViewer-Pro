@@ -11,6 +11,8 @@ import type { Language } from '../i18n';
 import { t } from '../i18n';
 import { BUILD_EDITION } from '../application/edition';
 import { Ribbon, type RibbonProFeature } from './Ribbon';
+import { ImageEditor } from './ImageEditor';
+import { RibbonCommandDialog, type RibbonDialogKind } from './RibbonCommandDialog';
 import { ScreenCaptureDialog } from './ScreenCaptureDialog';
 import { BatchEditDialog } from './BatchEditDialog';
 import { DuplicateSearchDialog } from './DuplicateSearchDialog';
@@ -63,6 +65,12 @@ interface ThumbnailGridProps {
   onCheckForUpdates?: () => void;
   onClose?: () => void;
   onNavigateUp?: () => void;
+  onNavigateBack?: () => void;
+  onNavigateForward?: () => void;
+  canNavigateBack?: boolean;
+  canNavigateForward?: boolean;
+  onStartSlideshow?: (index: number, collection: ImageFile[]) => void;
+  onActiveImageChange?: (image: ImageFile | null) => void;
 }
 
 interface ViewPreferences {
@@ -154,6 +162,109 @@ function isEditableElement(target: EventTarget | null): boolean {
   if (target.isContentEditable) return true;
   const tagName = target.tagName.toLowerCase();
   return tagName === 'input' || tagName === 'textarea' || tagName === 'select';
+}
+
+interface SaveFileHandle {
+  createWritable: () => Promise<{ write: (data: Blob) => Promise<void>; close: () => Promise<void> }>;
+}
+
+type SaveFilePicker = (options: unknown) => Promise<SaveFileHandle>;
+
+function imageMimeType(image: ImageFile): 'image/jpeg' | 'image/png' | 'image/webp' | null {
+  if (image.type === 'image/jpeg' || image.type === 'image/png' || image.type === 'image/webp') return image.type;
+  return null;
+}
+
+function loadImage(url: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const source = new Image();
+    source.onload = () => resolve(source);
+    source.onerror = () => reject(new Error('Unable to load the image.'));
+    source.src = url;
+  });
+}
+
+async function readImageBlob(image: ImageFile): Promise<Blob> {
+  if (image.source === 'folder' && image.path && typeof window.electron.readImageData === 'function') {
+    const bytes = await window.electron.readImageData(image.path);
+    const buffer = new ArrayBuffer(bytes.byteLength);
+    new Uint8Array(buffer).set(bytes);
+    return new Blob([buffer], { type: image.type || 'application/octet-stream' });
+  }
+  if (image.file) return image.file;
+  const response = await fetch(image.url);
+  if (!response.ok) throw new Error('Unable to read the image.');
+  return response.blob();
+}
+
+function canvasBlob(canvas: HTMLCanvasElement, type: string, quality = 0.95): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob);
+      else reject(new Error('Unable to create the image.'));
+    }, type, quality);
+  });
+}
+
+async function rotateImageOnDisk(image: ImageFile, degrees: -90 | 90): Promise<void> {
+  if (!image.path || image.source !== 'folder') throw new Error('Imported images must be saved before they can be rotated.');
+  const mimeType = imageMimeType(image);
+  if (!mimeType) throw new Error('Rotation supports JPG, PNG, and WebP files.');
+  const sourceBlob = await readImageBlob(image);
+  const sourceUrl = URL.createObjectURL(sourceBlob);
+  try {
+    const source = await loadImage(sourceUrl);
+    const canvas = document.createElement('canvas');
+    const quarterTurn = Math.abs(degrees) === 90;
+    canvas.width = quarterTurn ? source.naturalHeight : source.naturalWidth;
+    canvas.height = quarterTurn ? source.naturalWidth : source.naturalHeight;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas is unavailable.');
+    context.translate(canvas.width / 2, canvas.height / 2);
+    context.rotate((degrees * Math.PI) / 180);
+    context.drawImage(source, -source.naturalWidth / 2, -source.naturalHeight / 2);
+    const blob = await canvasBlob(canvas, mimeType);
+    await window.electron.overwriteImageFile(image.path, await blob.arrayBuffer());
+  } finally {
+    URL.revokeObjectURL(sourceUrl);
+  }
+}
+
+async function saveImageAs(image: ImageFile): Promise<void> {
+  const picker = (window as Window & { showSaveFilePicker?: SaveFilePicker }).showSaveFilePicker;
+  if (picker) {
+    try {
+      const blob = await readImageBlob(image);
+      const extension = image.name.includes('.') ? image.name.slice(image.name.lastIndexOf('.')) : '.png';
+      const handle = await picker({ suggestedName: image.name, types: [{ description: 'Image file', accept: { [image.type || 'image/png']: [extension] } }] });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+    }
+  }
+  const anchor = document.createElement('a');
+  anchor.href = image.url;
+  anchor.download = image.name;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character] ?? character));
+}
+
+function printImage(image: ImageFile): boolean {
+  const printWindow = window.open('', '_blank', 'width=1000,height=800');
+  if (!printWindow) return false;
+  const title = escapeHtml(image.name);
+  const url = escapeHtml(image.url);
+  printWindow.document.write(`<!doctype html><html><head><title>${title}</title><style>html,body{margin:0;height:100%;background:#fff}body{display:flex;align-items:center;justify-content:center}img{max-width:100%;max-height:100%;object-fit:contain}@media print{body{height:100vh}}</style></head><body><img src="${url}" alt="${title}" onload="window.focus();window.print();window.onafterprint=function(){window.close()}" /></body></html>`);
+  printWindow.document.close();
+  return true;
 }
 
 function getParentFolderPath(folderPath: string | null): string | null {
@@ -866,6 +977,12 @@ export function ThumbnailGrid({
   onCheckForUpdates,
   onClose,
   onNavigateUp,
+  onNavigateBack,
+  onNavigateForward,
+  canNavigateBack = false,
+  canNavigateForward = false,
+  onStartSlideshow,
+  onActiveImageChange,
 }: ThumbnailGridProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>(viewPreferences?.sortMode ?? 'name');
@@ -893,6 +1010,8 @@ export function ThumbnailGrid({
   const [busy, setBusy] = useState(false);
   const [gridFocused, setGridFocused] = useState(false);
   const [dimensionsById, setDimensionsById] = useState<Record<string, { width: number; height: number }>>({});
+  const [commandDialog, setCommandDialog] = useState<RibbonDialogKind | null>(null);
+  const [editorImage, setEditorImage] = useState<ImageFile | null>(null);
   const gridRef = useRef<HTMLDivElement | null>(null);
 
   const filtered = useMemo(() => filterAndSortImages(
@@ -961,6 +1080,10 @@ export function ThumbnailGrid({
       return { ...previous, [image.id]: { width, height } };
     });
   }, []);
+
+  useEffect(() => {
+    onActiveImageChange?.(activeImage);
+  }, [activeImage, onActiveImageChange]);
 
   useEffect(() => {
     if (!statusMessage) return;
@@ -1147,6 +1270,125 @@ export function ThumbnailGrid({
     }
     showStatus('No image selected.');
   }, [activeIndex, openImageByIndex, showStatus]);
+
+  const startSlideshow = useCallback(() => {
+    if (activeIndex < 0) {
+      showStatus('No image selected.');
+      return;
+    }
+    if (onStartSlideshow) {
+      onStartSlideshow(activeIndex, filtered);
+      return;
+    }
+    openActiveImage();
+  }, [activeIndex, filtered, onStartSlideshow, openActiveImage, showStatus]);
+
+  const saveActiveImage = useCallback(async () => {
+    if (!activeImage) {
+      showStatus('No image selected.');
+      return;
+    }
+    try {
+      await saveImageAs(activeImage);
+      showStatus('Image saved.');
+    } catch (error) {
+      showStatus(error instanceof Error ? error.message : 'Unable to save the image.');
+    }
+  }, [activeImage, showStatus]);
+
+  const printActiveImage = useCallback(() => {
+    if (!activeImage) {
+      showStatus('No image selected.');
+      return;
+    }
+    if (!printImage(activeImage)) {
+      showStatus('Allow pop-ups to print the image.');
+      return;
+    }
+    showStatus('Print window opened.');
+  }, [activeImage, showStatus]);
+
+  const rotateSelection = useCallback(async (degrees: -90 | 90) => {
+    const targets = getActionImages().filter((image) => image.source === 'folder' && image.path);
+    if (targets.length === 0) {
+      showStatus('Select a saved JPG, PNG, or WebP image first.');
+      return;
+    }
+    setBusy(true);
+    let completed = 0;
+    let failed = 0;
+    let firstError = '';
+    try {
+      for (const image of targets) {
+        try {
+          await rotateImageOnDisk(image, degrees);
+          completed += 1;
+        } catch (error) {
+          failed += 1;
+          if (!firstError) firstError = error instanceof Error ? error.message : 'Rotation failed.';
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
+    await onRefresh?.();
+    if (failed > 0) {
+      showStatus(`${completed} rotated, ${failed} failed. ${firstError}`);
+    } else {
+      showStatus(`${completed} image(s) rotated ${degrees > 0 ? '90°' : '-90°'}.`);
+    }
+  }, [getActionImages, onRefresh, showStatus]);
+
+  const viewCopiedImage = useCallback(() => {
+    const item = clipboard?.items[0];
+    if (!item) {
+      showStatus('Clipboard is empty.');
+      return;
+    }
+    const existingIndex = filtered.findIndex((image) => image.path.toLowerCase() === item.path.toLowerCase());
+    if (existingIndex >= 0) {
+      openImageByIndex(existingIndex);
+      return;
+    }
+    const name = item.name || item.path.split(/[\\/]/).pop() || item.path;
+    const extension = name.includes('.') ? name.slice(name.lastIndexOf('.') + 1).toLowerCase() : '';
+    const imported: ImageFile = {
+      id: `clipboard:${item.path}`,
+      name,
+      url: window.electron.toLocalUrl(item.path),
+      size: 0,
+      type: extension ? `image/${extension === 'jpg' ? 'jpeg' : extension}` : 'image/*',
+      lastModified: Date.now(),
+      path: item.path,
+      source: 'folder',
+    };
+    onImageClick(0, [imported]);
+  }, [clipboard, filtered, onImageClick, openImageByIndex, showStatus]);
+
+  const openMetadataDialog = useCallback(() => {
+    if (!activeImage) {
+      showStatus('No image selected.');
+      return;
+    }
+    const metadata = getImageMetadata(activeImage);
+    setTagDraft(metadata.tags.join(', '));
+    setColorLabelDraft(metadata.colorLabel ?? '');
+    setCommandDialog('metadata');
+  }, [activeImage, showStatus]);
+
+  const saveCommandMetadata = useCallback((patch: Partial<ImageMetadata>) => {
+    if (!activeImage) return;
+    onUpdateImageMetadata(activeImage.id, patch);
+    showStatus('Metadata saved.');
+  }, [activeImage, onUpdateImageMetadata, showStatus]);
+
+  const openImageOptions = useCallback(() => {
+    if (!activeImage) {
+      showStatus('No image selected.');
+      return;
+    }
+    setEditorImage(activeImage);
+  }, [activeImage, showStatus]);
 
   const handleSelectClick = useCallback((e: React.MouseEvent, image: ImageFile) => {
     const multiSelect = e.ctrlKey || e.metaKey;
@@ -1684,6 +1926,23 @@ export function ThumbnailGrid({
         onCheckForUpdates={onCheckForUpdates}
         onClose={onClose}
         onOpenActive={openActiveImage}
+        onStartSlideshow={startSlideshow}
+        onSaveAs={() => void saveActiveImage()}
+        onPrint={printActiveImage}
+        onShowCameraInfo={() => setCommandDialog('camera')}
+        onShowProperties={() => setCommandDialog('properties')}
+        onRotate={rotateSelection}
+        onNavigateBack={onNavigateBack}
+        onNavigateForward={onNavigateForward}
+        onNavigateUp={onNavigateUp}
+        canNavigateUp={Boolean(getParentFolderPath(currentFolderPath))}
+        canNavigateBack={canNavigateBack}
+        canNavigateForward={canNavigateForward}
+        onShowFileOptions={() => setCommandDialog('file-options')}
+        onShowImageOptions={openImageOptions}
+        onViewCopiedImage={viewCopiedImage}
+        onShowMetadata={openMetadataDialog}
+        onShowShortcuts={() => setCommandDialog('shortcuts')}
         onViewSizeChange={changeViewSize}
         onSortModeChange={setSortModeValue}
         onSortDirectionChange={(direction) => {
@@ -2153,6 +2412,35 @@ export function ThumbnailGrid({
           </div>
         </div>
       )}
+
+      {commandDialog && (
+        <RibbonCommandDialog
+          kind={commandDialog}
+          language={language}
+          image={activeImage}
+          formatFilter={formatFilter}
+          sizeFilter={sizeFilter}
+          dateFilter={dateFilter}
+          favoriteOnly={favoriteOnly}
+          minimumRating={minimumRating}
+          onFormatChange={setFormatFilter}
+          onSizeChange={setSizeFilter}
+          onDateChange={setDateFilter}
+          onFavoriteChange={setFavoriteOnly}
+          onMinimumRatingChange={setMinimumRating}
+          onClearFilters={() => {
+            setFormatFilter('all');
+            setSizeFilter('all');
+            setDateFilter('all');
+            setFavoriteOnly(false);
+            setMinimumRating(0);
+          }}
+          onSaveMetadata={saveCommandMetadata}
+          onClose={() => setCommandDialog(null)}
+        />
+      )}
+
+      {editorImage && <ImageEditor image={editorImage} onClose={() => setEditorImage(null)} />}
 
       {captureOpen && BUILD_EDITION === 'pro' && (
         <ScreenCaptureDialog

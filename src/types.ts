@@ -231,6 +231,7 @@ declare global {
       renameImageFile: (sourcePath: string, nextName: string) => Promise<{ path: string; name: string }>;
       deleteImageFile: (sourcePath: string) => Promise<{ ok: true }>;
       overwriteImageFile: (sourcePath: string, bytes: ArrayBuffer) => Promise<{ path: string; name: string }>;
+      readImageData: (sourcePath: string) => Promise<Uint8Array>;
       batchFileOperation: (
         operation: 'copy' | 'move' | 'delete',
         sourcePaths: string[],

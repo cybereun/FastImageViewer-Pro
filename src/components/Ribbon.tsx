@@ -76,6 +76,23 @@ interface RibbonProps {
   onCheckForUpdates?: () => void;
   onClose?: () => void;
   onOpenActive?: () => void;
+  onStartSlideshow?: () => void;
+  onSaveAs?: () => void;
+  onPrint?: () => void;
+  onShowCameraInfo?: () => void;
+  onShowProperties?: () => void;
+  onRotate?: (degrees: -90 | 90) => void;
+  onNavigateBack?: () => void;
+  onNavigateForward?: () => void;
+  onNavigateUp?: () => void;
+  canNavigateUp?: boolean;
+  canNavigateBack?: boolean;
+  canNavigateForward?: boolean;
+  onShowFileOptions?: () => void;
+  onShowImageOptions?: () => void;
+  onViewCopiedImage?: () => void;
+  onShowMetadata?: () => void;
+  onShowShortcuts?: () => void;
   onViewSizeChange: (size: ViewSize) => void;
   onSortModeChange: (mode: SortMode) => void;
   onSortDirectionChange: (direction: SortDirection) => void;
@@ -176,6 +193,23 @@ export function Ribbon({
   onCheckForUpdates,
   onClose,
   onOpenActive,
+  onStartSlideshow,
+  onSaveAs,
+  onPrint,
+  onShowCameraInfo,
+  onShowProperties,
+  onRotate,
+  onNavigateBack,
+  onNavigateForward,
+  onNavigateUp,
+  canNavigateUp = false,
+  canNavigateBack = false,
+  canNavigateForward = false,
+  onShowFileOptions,
+  onShowImageOptions,
+  onViewCopiedImage,
+  onShowMetadata,
+  onShowShortcuts,
   onViewSizeChange,
   onSortModeChange,
   onSortDirectionChange,
@@ -276,6 +310,7 @@ export function Ribbon({
     unavailable: ko ? '이 기능은 다음 단계에서 연결됩니다.' : 'This command will be connected in the next step.',
     proOnly: ko ? 'Pro 전용 기능입니다. Pro로 전환하면 사용할 수 있습니다.' : 'This is a Pro feature. Switch to Pro to use it.',
     proReady: ko ? 'Pro 기능 모듈을 준비 중입니다.' : 'The Pro feature module is being prepared.',
+    alreadyPro: ko ? '현재 Pro 버전을 사용 중입니다.' : 'You are already using the Pro edition.',
   };
 
   const notifyUnavailable = () => onNotify?.(text.unavailable);
@@ -287,6 +322,14 @@ export function Ribbon({
     }
     onProFeature?.(feature);
     if (!onProFeature) onNotify?.(text.proReady);
+  };
+
+  const switchToPro = () => {
+    if (edition === 'pro') {
+      onNotify?.(text.alreadyPro);
+      return;
+    }
+    setProDialogFeature('capture');
   };
 
   const toggleFullscreen = () => {
@@ -345,10 +388,10 @@ export function Ribbon({
             <RibbonButton icon={FolderPlus} label={text.newFolder} onClick={onNewFolder ?? notifyUnavailable} />
           </RibbonGroup>
           <RibbonGroup label={ko ? '저장 및 정보' : 'Save & info'}>
-            <RibbonButton icon={Save} label={text.saveAs} disabled={!hasActiveImage} onClick={notifyUnavailable} />
-            <RibbonButton icon={Printer} label={text.print} disabled={!hasActiveImage} onClick={notifyUnavailable} />
-            <RibbonButton icon={Camera} label={text.cameraInfo} disabled={!hasActiveImage} onClick={notifyUnavailable} />
-            <RibbonButton icon={Info} label={text.properties} disabled={!hasActiveImage} onClick={notifyUnavailable} />
+            <RibbonButton icon={Save} label={text.saveAs} disabled={!hasActiveImage} onClick={onSaveAs ?? notifyImageRequired} />
+            <RibbonButton icon={Printer} label={text.print} disabled={!hasActiveImage} onClick={onPrint ?? notifyImageRequired} />
+            <RibbonButton icon={Camera} label={text.cameraInfo} disabled={!hasActiveImage} onClick={onShowCameraInfo ?? notifyImageRequired} />
+            <RibbonButton icon={Info} label={text.properties} disabled={!hasActiveImage} onClick={onShowProperties ?? notifyImageRequired} />
           </RibbonGroup>
           <RibbonGroup label={text.groups.support}>
             <RibbonButton icon={Download} label={text.update} onClick={onCheckForUpdates} />
@@ -364,12 +407,12 @@ export function Ribbon({
         <>
           <RibbonGroup label={text.groups.mode}>
             <RibbonButton icon={Eye} label={text.viewer} disabled={!hasActiveImage} onClick={onOpenActive ?? notifyImageRequired} />
-            <RibbonButton icon={Play} label={text.slideshow} disabled={!hasActiveImage} onClick={onOpenActive ?? notifyImageRequired} />
+            <RibbonButton icon={Play} label={text.slideshow} disabled={!hasActiveImage} onClick={onStartSlideshow ?? onOpenActive ?? notifyImageRequired} />
             <RibbonButton icon={Maximize2} label={text.fullscreen} onClick={toggleFullscreen} />
           </RibbonGroup>
           <RibbonGroup label={text.groups.rotate}>
-            <RibbonButton icon={RotateCcw} label={text.rotateLeft} disabled={!hasActiveImage} onClick={notifyUnavailable} />
-            <RibbonButton icon={RotateCw} label={text.rotateRight} disabled={!hasActiveImage} onClick={notifyUnavailable} />
+            <RibbonButton icon={RotateCcw} label={text.rotateLeft} disabled={!hasActiveImage} onClick={() => onRotate?.(-90)} />
+            <RibbonButton icon={RotateCw} label={text.rotateRight} disabled={!hasActiveImage} onClick={() => onRotate?.(90)} />
           </RibbonGroup>
           <RibbonGroup label={text.groups.viewFormat}>
             <RibbonButton icon={Eye} label={text.preview} active={viewSize === 'large'} onClick={() => setViewMode('large')} compact />
@@ -415,15 +458,15 @@ export function Ribbon({
             <RibbonButton icon={sortDirection === 'asc' ? ArrowUp : ArrowDown} label={sortDirection === 'asc' ? (ko ? '오름차순' : 'Ascending') : (ko ? '내림차순' : 'Descending')} onClick={() => onSortDirectionChange(sortDirection === 'asc' ? 'desc' : 'asc')} compact />
           </RibbonGroup>
           <RibbonGroup label={text.groups.explore}>
-            <RibbonButton icon={ArrowLeft} label={text.back} onClick={notifyUnavailable} compact />
-            <RibbonButton icon={ArrowRight} label={text.forward} onClick={notifyUnavailable} compact />
-            <RibbonButton icon={FolderUp} label={text.up} onClick={notifyUnavailable} compact />
+            <RibbonButton icon={ArrowLeft} label={text.back} disabled={!canNavigateBack} onClick={onNavigateBack} compact />
+            <RibbonButton icon={ArrowRight} label={text.forward} disabled={!canNavigateForward} onClick={onNavigateForward} compact />
+            <RibbonButton icon={FolderUp} label={text.up} disabled={!canNavigateUp} onClick={onNavigateUp} compact />
             <RibbonButton icon={FolderOpen} label={text.documents} onClick={onOpenFolder} compact />
           </RibbonGroup>
           <RibbonGroup label={text.groups.advanced}>
-            <RibbonButton icon={SlidersHorizontal} label={text.fileOptions} onClick={notifyUnavailable} compact />
-            <RibbonButton icon={Image} label={text.imageOptions} onClick={notifyUnavailable} compact />
-            <RibbonButton icon={Copy} label={text.copiedView} onClick={notifyUnavailable} compact />
+            <RibbonButton icon={SlidersHorizontal} label={text.fileOptions} onClick={onShowFileOptions ?? notifyUnavailable} compact />
+            <RibbonButton icon={Image} label={text.imageOptions} disabled={!hasActiveImage} onClick={onShowImageOptions ?? notifyImageRequired} compact />
+            <RibbonButton icon={Copy} label={text.copiedView} onClick={onViewCopiedImage ?? notifyUnavailable} compact />
           </RibbonGroup>
           <RibbonGroup label={text.groups.refresh}>
             <RibbonButton icon={RefreshCw} label={text.refresh} onClick={onRefresh} />
@@ -437,7 +480,7 @@ export function Ribbon({
         <>
           <RibbonGroup label={text.groups.changes}>
             <RibbonButton icon={SlidersHorizontal} label={text.batchEdit} locked={edition !== 'pro'} onClick={() => runProFeature('batch-edit')} />
-            <RibbonButton icon={FileOutput} label={text.convert} locked={edition !== 'pro'} onClick={() => runProFeature('batch-edit')} />
+            <RibbonButton icon={FileOutput} label={text.convert} locked={edition !== 'pro'} onClick={() => runProFeature('advanced-export')} />
             <RibbonButton icon={Copy} label={text.copyToFolder} disabled={selectedCount === 0} onClick={onCopyToFolder ?? notifyUnavailable} compact />
             <RibbonButton icon={FolderUp} label={text.move} disabled={selectedCount === 0} onClick={onMoveToFolder ?? notifyUnavailable} />
           </RibbonGroup>
@@ -446,7 +489,7 @@ export function Ribbon({
             <RibbonButton icon={FileOutput} label={text.export} locked={edition !== 'pro'} onClick={() => runProFeature('advanced-export')} />
           </RibbonGroup>
           <RibbonGroup label={text.groups.organize}>
-            <RibbonButton icon={Tags} label={text.metadata} disabled={selectedCount === 0} onClick={notifyUnavailable} />
+            <RibbonButton icon={Tags} label={text.metadata} disabled={selectedCount === 0} onClick={onShowMetadata ?? notifyImageRequired} />
             <RibbonButton icon={Search} label={text.duplicates} locked={edition !== 'pro'} onClick={() => runProFeature('duplicate-search')} />
             <RibbonButton icon={Star} label={ko ? '즐겨찾기' : 'Favorites'} disabled={selectedCount === 0} onClick={onToggleFavorite ?? notifyUnavailable} />
           </RibbonGroup>
@@ -457,12 +500,12 @@ export function Ribbon({
     return (
       <>
         <RibbonGroup label={text.groups.support}>
-          <RibbonButton icon={Keyboard} label={text.shortcuts} onClick={notifyUnavailable} />
+          <RibbonButton icon={Keyboard} label={text.shortcuts} onClick={onShowShortcuts ?? notifyUnavailable} />
           <RibbonButton icon={Info} label={text.about} onClick={onAbout} />
           <RibbonButton icon={RefreshCw} label={text.update} onClick={onCheckForUpdates} />
         </RibbonGroup>
         <RibbonGroup label={ko ? 'Pro' : 'Pro edition'}>
-          <RibbonButton icon={LockKeyhole} label={ko ? 'Pro로 전환' : 'Switch to Pro'} locked={edition !== 'pro'} onClick={() => runProFeature('capture')} tone="accent" />
+          <RibbonButton icon={LockKeyhole} label={ko ? 'Pro로 전환' : 'Switch to Pro'} locked={edition !== 'pro'} onClick={switchToPro} tone="accent" />
         </RibbonGroup>
       </>
     );
