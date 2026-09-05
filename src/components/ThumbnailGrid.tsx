@@ -587,6 +587,7 @@ function ThumbnailItem({
     // while object-contain below preserves each image's natural ratio.
     large: 'h-48',
     'large-icons': 'h-20',
+    filmstrip: 'h-48',
   };
 
   return (
@@ -655,6 +656,142 @@ function ThumbnailItem({
         <p className="truncate text-left text-xs text-gray-300">{image.name}</p>
       </div>
     </button>
+  );
+}
+
+interface FilmstripViewProps {
+  images: ImageFile[];
+  activeImage: ImageFile | null;
+  activeIndex: number;
+  currentFolderPath: string | null;
+  language: Language;
+  busy: boolean;
+  selectedIds: Set<string>;
+  activeId: string | null;
+  cutIdSet: Set<string>;
+  gridRef: React.MutableRefObject<HTMLDivElement | null>;
+  onFocus: () => void;
+  onBlur: () => void;
+  onNavigateUp?: () => void;
+  onSelectClick: (e: React.MouseEvent, image: ImageFile) => void;
+  onDoubleClick: (index: number) => void;
+  onContextMenu: (e: React.MouseEvent, image: ImageFile) => void;
+  onDragStart: (e: React.DragEvent, image: ImageFile) => void;
+  onImageLoad?: (image: ImageFile, width: number, height: number) => void;
+}
+
+function FilmstripView({
+  images,
+  activeImage,
+  activeIndex,
+  currentFolderPath,
+  language,
+  busy,
+  selectedIds,
+  activeId,
+  cutIdSet,
+  gridRef,
+  onFocus,
+  onBlur,
+  onNavigateUp,
+  onSelectClick,
+  onDoubleClick,
+  onContextMenu,
+  onDragStart,
+  onImageLoad,
+}: FilmstripViewProps) {
+  const [loaded, setLoaded] = useState(false);
+  const [error, setError] = useState(false);
+  const showParentFolder = Boolean(getParentFolderPath(currentFolderPath)) && Boolean(onNavigateUp);
+
+  useEffect(() => {
+    setLoaded(false);
+    setError(false);
+  }, [activeImage?.id, activeImage?.url]);
+
+  return (
+    <div
+      ref={gridRef}
+      tabIndex={0}
+      onFocus={onFocus}
+      onBlur={onBlur}
+      className="flex min-h-0 flex-1 flex-col overflow-hidden bg-gray-900 outline-none"
+    >
+      <div
+        className={cn(
+          'relative flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-gray-900 p-3',
+          activeImage && 'cursor-zoom-in'
+        )}
+        onDoubleClick={() => {
+          if (activeIndex >= 0) onDoubleClick(activeIndex);
+        }}
+        title={activeImage
+          ? (language === 'ko' ? '두 번 클릭하여 전체 화면으로 열기' : 'Double-click to open full view')
+          : undefined}
+      >
+        <div className="flex h-full w-full items-center justify-center overflow-hidden rounded-md bg-gray-950/60">
+          {!activeImage ? (
+            <ImageIcon size={72} className="text-gray-600" />
+          ) : error ? (
+            <ImageIcon size={72} className="text-gray-600" />
+          ) : (
+            <>
+              {!loaded && (
+                <div className="absolute flex items-center justify-center">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-600 border-t-blue-400" />
+                </div>
+              )}
+              <img
+                src={activeImage.url}
+                alt={activeImage.name}
+                className={cn('max-h-full max-w-full object-contain', !loaded && 'opacity-0')}
+                onLoad={(event) => {
+                  setLoaded(true);
+                  const { naturalWidth, naturalHeight } = event.currentTarget;
+                  if ((!activeImage.width || !activeImage.height) && naturalWidth > 0 && naturalHeight > 0) {
+                    onImageLoad?.(activeImage, naturalWidth, naturalHeight);
+                  }
+                }}
+                onError={() => setError(true)}
+              />
+            </>
+          )}
+        </div>
+        {activeImage && (
+          <div className="pointer-events-none absolute bottom-5 left-1/2 max-w-[80%] -translate-x-1/2 truncate rounded bg-black/60 px-3 py-1 text-xs text-gray-200 shadow">
+            {activeImage.name}
+          </div>
+        )}
+      </div>
+
+      <div className="shrink-0 border-t border-gray-700 bg-gray-900 px-2 py-2">
+        <div className="flex items-stretch gap-2 overflow-x-auto pb-1">
+          {showParentFolder && (
+            <div className="w-48 shrink-0">
+              <ParentFolderItem onClick={() => onNavigateUp?.()} language={language} disabled={busy} />
+            </div>
+          )}
+          {images.map((image, index) => (
+            <div key={image.id} className="w-48 shrink-0">
+              <ThumbnailItem
+                image={image}
+                index={index}
+                active={activeId === image.id}
+                selected={selectedIds.has(image.id)}
+                dimmedForCut={cutIdSet.has(image.path)}
+                disabled={busy}
+                viewSize="large"
+                onClick={onSelectClick}
+                onDoubleClick={onDoubleClick}
+                onContextMenu={onContextMenu}
+                onDragStart={onDragStart}
+                onImageLoad={onImageLoad}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -753,7 +890,7 @@ export function ThumbnailGrid({
   }, [dimensionsById, selectedImages]);
   const activeIndex = activeId ? filtered.findIndex((image) => image.id === activeId) : -1;
   const activeImage = activeIndex >= 0 ? filtered[activeIndex] ?? null : null;
-  const showParentFolder = (viewSize === 'small' || viewSize === 'medium' || viewSize === 'large' || viewSize === 'large-icons')
+  const showParentFolder = (viewSize === 'small' || viewSize === 'medium' || viewSize === 'large' || viewSize === 'large-icons' || viewSize === 'filmstrip')
     && Boolean(getParentFolderPath(currentFolderPath))
     && Boolean(onNavigateUp);
 
@@ -1461,6 +1598,7 @@ export function ThumbnailGrid({
     // and still adapts cleanly to narrow windows.
     large: 'grid-cols-[repeat(auto-fill,minmax(230px,1fr))]',
     'large-icons': 'grid-cols-[repeat(auto-fill,minmax(340px,1fr))]',
+    filmstrip: 'grid-cols-1',
   };
 
   const menuPosition = useMemo(() => {
@@ -1616,6 +1754,28 @@ export function ThumbnailGrid({
       )}
 
       {filtered.length > 0 || showParentFolder ? (
+        viewSize === 'filmstrip' ? (
+          <FilmstripView
+            images={filtered}
+            activeImage={activeImage}
+            activeIndex={activeIndex}
+            currentFolderPath={currentFolderPath}
+            language={language}
+            busy={busy}
+            selectedIds={selectedIds}
+            activeId={activeId}
+            cutIdSet={cutIdSet}
+            gridRef={gridRef}
+            onFocus={() => setGridFocused(true)}
+            onBlur={() => setGridFocused(false)}
+            onNavigateUp={onNavigateUp}
+            onSelectClick={handleSelectClick}
+            onDoubleClick={openImageByIndex}
+            onContextMenu={handleContextMenu}
+            onDragStart={handleDragStart}
+            onImageLoad={handleImageLoad}
+          />
+        ) : (
         <div
           ref={gridRef}
           tabIndex={0}
@@ -1721,6 +1881,7 @@ export function ThumbnailGrid({
             )
           ))}
         </div>
+        )
       ) : images.length > 0 ? (
         <div className="flex flex-1 items-center justify-center text-gray-500">
           <div className="text-center">

@@ -26,7 +26,7 @@ function normalizePreferences(value) {
     if (source.language === 'ko' || source.language === 'en') result.language = source.language;
     if (source.theme === 'dark' || source.theme === 'light') result.theme = source.theme;
     if (typeof source.sidebarOpen === 'boolean') result.sidebarOpen = source.sidebarOpen;
-    if (source.viewSize === 'small' || source.viewSize === 'medium' || source.viewSize === 'large' || source.viewSize === 'large-icons') {
+    if (source.viewSize === 'small' || source.viewSize === 'medium' || source.viewSize === 'large' || source.viewSize === 'large-icons' || source.viewSize === 'filmstrip') {
         result.viewSize = source.viewSize;
     }
     if (source.sortMode === 'name' || source.sortMode === 'type' || source.sortMode === 'size' || source.sortMode === 'date' || source.sortMode === 'rating') {
