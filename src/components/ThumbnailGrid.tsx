@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Grid3X3, ArrowUpDown, Search, Image as ImageIcon, Star } from 'lucide-react';
+import { Grid3X3, ArrowUpDown, Search, Image as ImageIcon, Star, FolderUp } from 'lucide-react';
 import type { BatchOperationResult, BatchRenameRequest, ImageFile, ImageMetadata, SortDirection, SortMode, ViewSize } from '../types';
 import { cn } from '../utils/cn';
 import { IMAGE_DRAG_MIME } from '../constants/drag';
@@ -62,6 +62,7 @@ interface ThumbnailGridProps {
   onAbout?: () => void;
   onCheckForUpdates?: () => void;
   onClose?: () => void;
+  onNavigateUp?: () => void;
 }
 
 interface ViewPreferences {
@@ -136,6 +137,49 @@ function isEditableElement(target: EventTarget | null): boolean {
   if (target.isContentEditable) return true;
   const tagName = target.tagName.toLowerCase();
   return tagName === 'input' || tagName === 'textarea' || tagName === 'select';
+}
+
+function getParentFolderPath(folderPath: string | null): string | null {
+  if (!folderPath) return null;
+  const trimmed = folderPath.replace(/[\\/]+$/, '');
+  if (/^[A-Za-z]:$/.test(trimmed)) return null;
+  const separator = Math.max(trimmed.lastIndexOf('\\'), trimmed.lastIndexOf('/'));
+  if (separator < 0) return null;
+  if (separator === 2 && /^[A-Za-z]:/.test(trimmed)) return `${trimmed.slice(0, 2)}\\`;
+  return trimmed.slice(0, separator) || null;
+}
+
+function ParentFolderItem({
+  language,
+  disabled,
+  onClick,
+}: {
+  language: Language;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'group relative flex min-w-0 flex-col overflow-hidden rounded-lg border border-gray-700 bg-gray-800 transition-all hover:border-blue-500 focus:outline-none',
+        disabled && 'cursor-wait opacity-70'
+      )}
+      title={language === 'ko' ? '상위 폴더로 이동' : 'Go to parent folder'}
+    >
+      <div className="relative flex h-48 w-full items-center justify-center overflow-hidden bg-gray-900">
+        <FolderUp size={68} strokeWidth={1.5} className="text-amber-400 drop-shadow" />
+      </div>
+      <div className="w-full px-2 py-1.5">
+        <p className="truncate text-left text-xs font-medium text-gray-300">..</p>
+        <p className="truncate text-left text-[11px] text-gray-500">
+          {language === 'ko' ? '상위 폴더' : 'Parent folder'}
+        </p>
+      </div>
+    </button>
+  );
 }
 
 function ThumbnailItem({
@@ -224,7 +268,10 @@ function ThumbnailItem({
   const sizeClasses = {
     small: 'h-28',
     medium: 'h-44',
-    large: 'h-64',
+    // Preview uses a wide, Explorer-style tile.  Keep one consistent canvas
+    // height so portrait and landscape photos can be compared in one row,
+    // while object-contain below preserves each image's natural ratio.
+    large: 'h-48',
   };
 
   return (
@@ -323,6 +370,7 @@ export function ThumbnailGrid({
   onAbout,
   onCheckForUpdates,
   onClose,
+  onNavigateUp,
 }: ThumbnailGridProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>(viewPreferences?.sortMode ?? 'name');
@@ -390,6 +438,7 @@ export function ThumbnailGrid({
   }, [dimensionsById, selectedImages]);
   const activeIndex = activeId ? filtered.findIndex((image) => image.id === activeId) : -1;
   const activeImage = activeIndex >= 0 ? filtered[activeIndex] ?? null : null;
+  const showParentFolder = viewSize === 'large' && Boolean(getParentFolderPath(currentFolderPath)) && Boolean(onNavigateUp);
 
   const showStatus = useCallback((message: string) => {
     setStatusMessage(message);
@@ -1090,7 +1139,10 @@ export function ThumbnailGrid({
   const gridCols = {
     small: 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8',
     medium: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
-    large: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
+    // Preview cards should fill the available width instead of collapsing to
+    // four oversized columns.  A 230px minimum matches the reference layout
+    // and still adapts cleanly to narrow windows.
+    large: 'grid-cols-[repeat(auto-fill,minmax(230px,1fr))]',
   };
 
   const menuPosition = useMemo(() => {
@@ -1245,7 +1297,7 @@ export function ThumbnailGrid({
         </div>
       )}
 
-      {filtered.length > 0 ? (
+      {filtered.length > 0 || showParentFolder ? (
         <div
           ref={gridRef}
           tabIndex={0}
@@ -1264,6 +1316,13 @@ export function ThumbnailGrid({
             gridFocused && 'ring-inset ring-2 ring-blue-500/40'
           )}
         >
+          {showParentFolder && (
+            <ParentFolderItem
+              language={language}
+              disabled={busy}
+              onClick={() => onNavigateUp?.()}
+            />
+          )}
           {filtered.map((image, index) => (
             <ThumbnailItem
               key={image.id}

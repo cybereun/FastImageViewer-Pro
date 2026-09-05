@@ -49,6 +49,12 @@ function samePath(left: string | null, right: string | null): boolean {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
 }
 
+function folderNameFromPath(folderPath: string): string {
+  const trimmed = folderPath.replace(/[\\/]+$/, '');
+  const separator = Math.max(trimmed.lastIndexOf('\\'), trimmed.lastIndexOf('/'));
+  return separator >= 0 ? trimmed.slice(separator + 1) || trimmed : trimmed;
+}
+
 function mapStorageRoot(root: StorageRoot, previous?: FolderNode): FolderNode {
   const id = root.id ?? root.path;
   const isVirtual = Boolean(root.isVirtual || root.kind === 'virtual');
@@ -342,6 +348,15 @@ export function useImageStore() {
     }
   }, [openFolderResult]);
 
+  const openFolderPath = useCallback(async (folderPath: string) => {
+    const content = await window.electron.readDirectory(folderPath);
+    await openFolderResult({
+      path: folderPath,
+      name: folderNameFromPath(folderPath),
+      content,
+    });
+  }, [openFolderResult]);
+
   const openFileRecords = useCallback(async (files: DirectoryContent['files']) => {
     if (files.length === 0) return;
     releaseImportedUrls();
@@ -530,6 +545,7 @@ export function useImageStore() {
     loading,
     error,
     openDirectory,
+    openFolderPath,
     toggleFolder,
     refreshRootFolders,
     refreshSelectedFolder,

@@ -24,6 +24,16 @@ import type { ImageFile, UpdateCheckResult, UpdateDownloadProgress, UpdateInfo }
 import { cn } from './utils/cn';
 import { t } from './i18n';
 
+function getParentFolderPath(folderPath: string | null): string | null {
+  if (!folderPath) return null;
+  const trimmed = folderPath.replace(/[\\/]+$/, '');
+  if (/^[A-Za-z]:$/.test(trimmed)) return null;
+  const separator = Math.max(trimmed.lastIndexOf('\\'), trimmed.lastIndexOf('/'));
+  if (separator < 0) return null;
+  if (separator === 2 && /^[A-Za-z]:/.test(trimmed)) return `${trimmed.slice(0, 2)}\\`;
+  return trimmed.slice(0, separator) || null;
+}
+
 export function App() {
   const {
     images,
@@ -38,6 +48,7 @@ export function App() {
     loading,
     error,
     openDirectory,
+    openFolderPath,
     toggleFolder,
     refreshRootFolders,
     refreshSelectedFolder,
@@ -195,6 +206,18 @@ export function App() {
       setNotice(createError instanceof Error ? createError.message : (preferences.language === 'ko' ? '새 폴더를 만들지 못했습니다.' : 'Unable to create the folder.'));
     }
   }, [preferences.language, refreshSelectedFolder, selectedFolder]);
+
+  const handleNavigateUp = useCallback(async () => {
+    const parentPath = getParentFolderPath(selectedFolder);
+    if (!parentPath) return;
+    try {
+      await openFolderPath(parentPath);
+    } catch (navigateError) {
+      setNotice(navigateError instanceof Error
+        ? navigateError.message
+        : (preferences.language === 'ko' ? '상위 폴더를 열지 못했습니다.' : 'Unable to open the parent folder.'));
+    }
+  }, [openFolderPath, preferences.language, selectedFolder]);
 
   const handleImageDropToFolder = useCallback(
     async ({ imagePaths, targetFolderPath, move }: { imagePaths: string[]; targetFolderPath: string; move: boolean }) => {
@@ -410,6 +433,7 @@ export function App() {
               onAbout={() => setAboutOpen(true)}
               onCheckForUpdates={() => void handleCheckForUpdates()}
               onClose={() => window.electron.closeWindow()}
+              onNavigateUp={() => void handleNavigateUp()}
               language={preferences.language}
             />
           )}
