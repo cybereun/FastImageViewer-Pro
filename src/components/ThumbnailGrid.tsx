@@ -12,6 +12,8 @@ import { t } from '../i18n';
 import { BUILD_EDITION } from '../application/edition';
 import { Ribbon, type RibbonProFeature } from './Ribbon';
 import { ScreenCaptureDialog } from './ScreenCaptureDialog';
+import { BatchEditDialog } from './BatchEditDialog';
+import { DuplicateSearchDialog } from './DuplicateSearchDialog';
 
 export interface SelectionSummary {
   count: number;
@@ -341,6 +343,8 @@ export function ThumbnailGrid({
   const [batchRenameOpen, setBatchRenameOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState | null>(null);
   const [captureOpen, setCaptureOpen] = useState(false);
+  const [batchEditRequest, setBatchEditRequest] = useState<{ mode: 'edit' | 'export'; images: ImageFile[] } | null>(null);
+  const [duplicateSearchImages, setDuplicateSearchImages] = useState<ImageFile[] | null>(null);
   const [clipboard, setClipboard] = useState<ClipboardState | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -789,9 +793,29 @@ export function ThumbnailGrid({
   }, [selectedImages.length, showStatus]);
 
   const handleProFeature = useCallback((feature: RibbonProFeature) => {
-    if (BUILD_EDITION === 'pro' && feature === 'capture') {
-      setCaptureOpen(true);
-      return;
+    if (BUILD_EDITION === 'pro') {
+      if (feature === 'capture') {
+        setCaptureOpen(true);
+        return;
+      }
+      if (feature === 'batch-edit' || feature === 'advanced-export') {
+        const targets = getActionImages().filter((image) => image.source === 'folder' && image.path);
+        if (targets.length === 0) {
+          showStatus('No saved image selected. Imported files must be saved first.');
+          return;
+        }
+        setBatchEditRequest({ mode: feature === 'advanced-export' ? 'export' : 'edit', images: targets });
+        return;
+      }
+      if (feature === 'duplicate-search') {
+        const targets = images.filter((image) => image.source === 'folder' && image.path);
+        if (targets.length < 2) {
+          showStatus('At least two saved images are required for duplicate search.');
+          return;
+        }
+        setDuplicateSearchImages(targets);
+        return;
+      }
     }
     const labels: Record<RibbonProFeature, string> = language === 'ko'
       ? {
@@ -809,7 +833,17 @@ export function ThumbnailGrid({
     showStatus(BUILD_EDITION === 'pro'
       ? (language === 'ko' ? 'Pro 모듈은 다음 단계에서 연결됩니다.' : 'The Pro module will be connected in the next step.')
       : labels[feature]);
-  }, [language, showStatus]);
+  }, [getActionImages, images, language, showStatus]);
+
+  const handleBatchEditComplete = useCallback((result: BatchOperationResult) => {
+    if (result.failed.length > 0) {
+      showStatus(`${result.succeeded.length} completed, ${result.failed.length} failed.`);
+    } else {
+      showStatus(`${result.succeeded.length} image(s) processed.`);
+    }
+    setBatchEditRequest(null);
+    onRefresh?.();
+  }, [onRefresh, showStatus]);
 
   const submitRename = useCallback(async () => {
     if (!renameDialog) return;
@@ -1478,6 +1512,24 @@ export function ThumbnailGrid({
           onCaptured={(result) => showStatus(language === 'ko'
             ? `캡처 완료 · ${result.width} × ${result.height}`
             : `Capture copied · ${result.width} × ${result.height}`)}
+        />
+      )}
+
+      {batchEditRequest && BUILD_EDITION === 'pro' && (
+        <BatchEditDialog
+          images={batchEditRequest.images}
+          language={language}
+          mode={batchEditRequest.mode}
+          onClose={() => setBatchEditRequest(null)}
+          onComplete={handleBatchEditComplete}
+        />
+      )}
+
+      {duplicateSearchImages && BUILD_EDITION === 'pro' && (
+        <DuplicateSearchDialog
+          images={duplicateSearchImages}
+          language={language}
+          onClose={() => setDuplicateSearchImages(null)}
         />
       )}
     </div>

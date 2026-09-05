@@ -17,6 +17,8 @@ const {
     overwriteImageFile,
     batchFileOperation,
     batchRenameImageFiles,
+    batchEditImages,
+    findDuplicateImages,
     getThumbnailDataUrl,
 } = require('./file-system');
 const { loadPreferences, savePreferences } = require('./preferences');
@@ -243,6 +245,8 @@ ipcMain.handle('fs:batchFileOperation', async (_event, operation, sourcePaths, t
     batchFileOperation(operation, sourcePaths, targetFolderPath)
 ));
 ipcMain.handle('fs:batchRenameImages', async (_event, renames) => batchRenameImageFiles(renames));
+ipcMain.handle('pro:batchEditImages', async (_event, sourcePaths, options) => batchEditImages(sourcePaths, options));
+ipcMain.handle('pro:findDuplicateImages', async (_event, sourcePaths) => findDuplicateImages(sourcePaths));
 
 async function queryPowerShellJson(command) {
     try {

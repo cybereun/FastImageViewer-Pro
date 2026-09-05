@@ -165,6 +165,30 @@ export interface BatchRenameRequest {
   nextName: string;
 }
 
+export type BatchImageFormat = 'original' | 'jpeg' | 'png' | 'webp';
+export type BatchImageRotation = 0 | 90 | 180 | 270;
+
+export interface BatchImageEditOptions {
+  outputFolderPath?: string | null;
+  format: BatchImageFormat;
+  quality: number;
+  maxWidth?: number | null;
+  maxHeight?: number | null;
+  rotation: BatchImageRotation;
+  suffix?: string;
+}
+
+export interface DuplicateImageFile {
+  sourcePath: string;
+  name: string;
+  size: number;
+}
+
+export interface DuplicateImageGroup {
+  hash: string;
+  files: DuplicateImageFile[];
+}
+
 export interface CaptureSource {
   id: string;
   name: string;
@@ -213,6 +237,8 @@ declare global {
         targetFolderPath?: string
       ) => Promise<BatchOperationResult>;
       batchRenameImages: (renames: BatchRenameRequest[]) => Promise<BatchOperationResult>;
+      batchEditImages: (sourcePaths: string[], options: BatchImageEditOptions) => Promise<BatchOperationResult>;
+      findDuplicateImages: (sourcePaths: string[]) => Promise<DuplicateImageGroup[]>;
       openImageFiles: () => Promise<DirectoryContent['files']>;
       startWatchingDirectory: (dirPath: string) => Promise<string>;
       stopWatchingDirectory: (watchId: string) => Promise<void>;

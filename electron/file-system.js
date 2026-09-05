@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { nativeImage, shell } = require('electron');
 const sharp = require('sharp');
 const { createOrientedThumbnail } = require('./thumbnail');
@@ -313,6 +314,133 @@ async function batchRenameImageFiles(renames) {
     return result;
 }
 
+const BATCH_IMAGE_FORMATS = new Set(['original', 'jpeg', 'png', 'webp']);
+const BATCH_ROTATIONS = new Set([0, 90, 180, 270]);
+
+function normalizeBatchDimension(value) {
+    if (value === null || value === undefined || value === '') return null;
+    const number = Number(value);
+    if (!Number.isFinite(number)) return null;
+    return Math.max(1, Math.min(12000, Math.round(number)));
+}
+
+function normalizeBatchOptions(options = {}) {
+    const format = BATCH_IMAGE_FORMATS.has(options.format) ? options.format : 'original';
+    const rotationValue = Number(options.rotation);
+    const rotation = BATCH_ROTATIONS.has(rotationValue) ? rotationValue : 0;
+    const qualityValue = Number(options.quality);
+    const quality = Number.isFinite(qualityValue) ? Math.max(1, Math.min(100, Math.round(qualityValue))) : 90;
+    const suffixValue = typeof options.suffix === 'string' ? options.suffix.trim() : '';
+    const suffix = sanitizeFileName(suffixValue) || '_edited';
+    return {
+        format,
+        rotation,
+        quality,
+        maxWidth: normalizeBatchDimension(options.maxWidth),
+        maxHeight: normalizeBatchDimension(options.maxHeight),
+        outputFolderPath: options.outputFolderPath ? String(options.outputFolderPath) : null,
+        suffix,
+    };
+}
+
+function resolveBatchOutput(sourcePath, requestedFormat) {
+    const sourceExtension = path.extname(sourcePath).slice(1).toLowerCase();
+    if (requestedFormat === 'jpeg') return { extension: 'jpg', format: 'jpeg' };
+    if (requestedFormat === 'png') return { extension: 'png', format: 'png' };
+    if (requestedFormat === 'webp') return { extension: 'webp', format: 'webp' };
+    if (['jpg', 'jpeg'].includes(sourceExtension)) return { extension: 'jpg', format: 'jpeg' };
+    if (sourceExtension === 'png') return { extension: 'png', format: 'png' };
+    if (sourceExtension === 'webp') return { extension: 'webp', format: 'webp' };
+    // Sharp can decode the remaining supported inputs, but PNG is the safest
+    // lossless output when the original extension is not a common output type.
+    return { extension: 'png', format: 'png' };
+}
+
+function buildBatchPipeline(sourcePath, output, options) {
+    let pipeline = sharp(sourcePath).rotate();
+    if (options.rotation !== 0) pipeline = pipeline.rotate(options.rotation);
+    if (options.maxWidth || options.maxHeight) {
+        pipeline = pipeline.resize({
+            width: options.maxWidth ?? undefined,
+            height: options.maxHeight ?? undefined,
+            fit: 'inside',
+            withoutEnlargement: true,
+        });
+    }
+    if (output.format === 'jpeg') return pipeline.jpeg({ quality: options.quality, mozjpeg: true });
+    if (output.format === 'webp') return pipeline.webp({ quality: options.quality });
+    return pipeline.png({ compressionLevel: 9 });
+}
+
+async function processBatchImage(sourcePath, options) {
+    const source = await ensureImageFile(sourcePath);
+    const output = resolveBatchOutput(source, options.format);
+    const parent = options.outputFolderPath
+        ? await ensureDirectory(options.outputFolderPath)
+        : path.dirname(source);
+    const baseName = path.basename(source, path.extname(source));
+    const destinationName = `${baseName}${options.suffix}.${output.extension}`;
+    const destination = getAvailablePath(parent, destinationName);
+    const temporary = path.join(parent, `.${path.basename(destination)}.fastimage-${Date.now()}-${Math.random().toString(16).slice(2)}.tmp`);
+    try {
+        await buildBatchPipeline(source, output, options).toFile(temporary);
+        await fs.promises.rename(temporary, destination);
+    } finally {
+        await fs.promises.rm(temporary, { force: true }).catch(() => undefined);
+    }
+    const stats = await fs.promises.stat(destination);
+    return { path: destination, name: path.basename(destination), size: stats.size };
+}
+
+async function batchEditImages(sourcePaths, rawOptions = {}) {
+    if (!Array.isArray(sourcePaths) || sourcePaths.length === 0) throw new Error('No source files were provided.');
+    const options = normalizeBatchOptions(rawOptions);
+    const result = { succeeded: [], failed: [] };
+    for (const sourcePath of sourcePaths) {
+        try {
+            const value = await processBatchImage(sourcePath, options);
+            result.succeeded.push({ sourcePath, destinationPath: value.path, name: value.name });
+        } catch (error) {
+            result.failed.push({ sourcePath, error: error.message || 'Batch image processing failed.' });
+        }
+    }
+    return result;
+}
+
+function hashFile(filePath) {
+    return new Promise((resolve, reject) => {
+        const hash = crypto.createHash('sha256');
+        const stream = fs.createReadStream(filePath);
+        stream.on('data', (chunk) => hash.update(chunk));
+        stream.on('error', reject);
+        stream.on('end', () => resolve(hash.digest('hex')));
+    });
+}
+
+async function findDuplicateImages(sourcePaths) {
+    if (!Array.isArray(sourcePaths) || sourcePaths.length === 0) return [];
+    const groups = new Map();
+    const seen = new Set();
+    for (const sourcePath of sourcePaths) {
+        try {
+            const source = await ensureImageFile(sourcePath);
+            const key = source.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            const stats = await fs.promises.stat(source);
+            const hash = await hashFile(source);
+            const group = groups.get(hash) ?? { hash, files: [] };
+            group.files.push({ sourcePath: source, name: path.basename(source), size: stats.size });
+            groups.set(hash, group);
+        } catch (error) {
+            console.warn('Skipped duplicate search item:', error.message);
+        }
+    }
+    return [...groups.values()]
+        .filter((group) => group.files.length > 1)
+        .sort((left, right) => right.files.reduce((sum, file) => sum + file.size, 0) - left.files.reduce((sum, file) => sum + file.size, 0));
+}
+
 async function getThumbnailDataUrl(filePath, requestedSize = 320) {
     const source = await ensureImageFile(filePath);
     const size = Math.max(64, Math.min(640, Number(requestedSize) || 320));
@@ -359,5 +487,7 @@ module.exports = {
     overwriteImageFile,
     batchFileOperation,
     batchRenameImageFiles,
+    batchEditImages,
+    findDuplicateImages,
     getThumbnailDataUrl,
 };

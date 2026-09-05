@@ -62,6 +62,8 @@ contextBridge.exposeInMainWorld('electron', {
     batchFileOperation: (operation, sourcePaths, targetFolderPath) =>
         ipcRenderer.invoke('fs:batchFileOperation', operation, sourcePaths, targetFolderPath),
     batchRenameImages: (renames) => ipcRenderer.invoke('fs:batchRenameImages', renames),
+    batchEditImages: (sourcePaths, options) => ipcRenderer.invoke('pro:batchEditImages', sourcePaths, options),
+    findDuplicateImages: (sourcePaths) => ipcRenderer.invoke('pro:findDuplicateImages', sourcePaths),
     startWatchingDirectory: (dirPath) => ipcRenderer.invoke('fs:startWatchingDirectory', dirPath),
     stopWatchingDirectory: (watchId) => ipcRenderer.invoke('fs:stopWatchingDirectory', watchId),
     onDirectoryChanged: (callback) => {
