@@ -39,6 +39,7 @@ export function App() {
     error,
     openDirectory,
     toggleFolder,
+    refreshRootFolders,
     refreshSelectedFolder,
     updatePreferences,
     updateImageMetadata,
@@ -275,6 +276,7 @@ export function App() {
             onImageDropToFolder={handleImageDropToFolder}
             onOpenDirectory={() => void openDirectory()}
             onOpenFiles={() => void openFiles()}
+            onRefreshRoots={refreshRootFolders}
             onLoadFiles={processFiles}
             totalCount={images.length}
             loading={loading}

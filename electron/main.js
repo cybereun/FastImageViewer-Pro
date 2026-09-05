@@ -2,6 +2,8 @@ const { app, BrowserWindow, ipcMain, dialog, protocol, Menu } = require('electro
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
 const {
     isSupportedImagePath,
     readDirectory,
@@ -19,6 +21,9 @@ const {
 const { loadPreferences, savePreferences } = require('./preferences');
 const { createUpdateManager } = require('./update-service');
 const { detectEdition } = require('./edition');
+const { normalizeStorageRoot } = require('./storage');
+
+const execFileAsync = promisify(execFile);
 
 const isDev = !app.isPackaged;
 const appEdition = detectEdition(app);
@@ -214,34 +219,95 @@ ipcMain.handle('fs:batchFileOperation', async (_event, operation, sourcePaths, t
 ));
 ipcMain.handle('fs:batchRenameImages', async (_event, renames) => batchRenameImageFiles(renames));
 
-ipcMain.handle('fs:getInitialRoots', async () => {
+async function queryWindowsDrives() {
+    if (process.platform !== 'win32') return [];
+
+    // Win32_LogicalDisk exposes the information Explorer uses for fixed,
+    // removable, optical and network volumes.  Keep this query best-effort:
+    // a restricted PowerShell policy must not prevent the app from showing
+    // the normal known folders and locally discoverable drive letters.
+    const command = [
+        '$ErrorActionPreference = "Stop"',
+        'Get-CimInstance -ClassName Win32_LogicalDisk',
+        '| Where-Object { $_.DriveType -in 2,3,4,5,6 }',
+        '| Select-Object DeviceID,VolumeName,DriveType,Size,FreeSpace,ProviderName',
+        '| ConvertTo-Json -Compress',
+    ].join(' ');
+
+    try {
+        const result = await execFileAsync('powershell.exe', [
+            '-NoLogo',
+            '-NoProfile',
+            '-NonInteractive',
+            '-ExecutionPolicy',
+            'Bypass',
+            '-Command',
+            command,
+        ], {
+            windowsHide: true,
+            timeout: 6000,
+            maxBuffer: 256 * 1024,
+        });
+        const text = String(result.stdout ?? '').trim();
+        if (!text) return [];
+        const parsed = JSON.parse(text);
+        const records = Array.isArray(parsed) ? parsed : [parsed];
+        return records.map(normalizeStorageRoot).filter(Boolean);
+    } catch (error) {
+        console.warn('Windows drive metadata query failed:', error.message);
+        return [];
+    }
+}
+
+async function getStorageRoots() {
     const roots = [];
-    const pushUnique = (name, rootPath) => {
-        const normalized = path.resolve(rootPath);
+    const pushUnique = (root) => {
+        if (!root || typeof root.path !== 'string') return;
+        const normalized = path.resolve(root.path);
         if (!fs.existsSync(normalized)) return;
-        if (roots.some((root) => root.path.toLowerCase() === normalized.toLowerCase())) return;
-        roots.push({ name, path: normalized });
+        if (roots.some((item) => item.path.toLowerCase() === normalized.toLowerCase())) return;
+        roots.push({ ...root, path: normalized });
     };
 
     const knownFolders = [
-        { name: 'Desktop', path: app.getPath('desktop') },
-        { name: 'Downloads', path: app.getPath('downloads') },
-        { name: 'Documents', path: app.getPath('documents') },
-        { name: 'Pictures', path: app.getPath('pictures') },
-        { name: 'Music', path: app.getPath('music') },
-        { name: 'Videos', path: app.getPath('videos') },
+        { name: 'Desktop', path: app.getPath('desktop'), specialKind: 'desktop' },
+        { name: 'Downloads', path: app.getPath('downloads'), specialKind: 'downloads' },
+        { name: 'Documents', path: app.getPath('documents'), specialKind: 'documents' },
+        { name: 'Pictures', path: app.getPath('pictures'), specialKind: 'pictures' },
+        { name: 'Music', path: app.getPath('music'), specialKind: 'music' },
+        { name: 'Videos', path: app.getPath('videos'), specialKind: 'videos' },
     ];
-    knownFolders.forEach((folder) => pushUnique(folder.name, folder.path));
+    knownFolders.forEach((folder) => pushUnique({ ...folder, kind: 'special' }));
 
+    const queriedDrives = await queryWindowsDrives();
+    queriedDrives.forEach(pushUnique);
+
+    // PowerShell can be unavailable on a locked-down machine.  Preserve the
+    // previous drive enumeration as a safe fallback, using a fixed-drive icon
+    // when the type cannot be determined.
     if (process.platform === 'win32') {
         for (let code = 65; code <= 90; code += 1) {
             const letter = String.fromCharCode(code);
             const drivePath = `${letter}:\\`;
-            if (fs.existsSync(drivePath)) pushUnique(`${letter}:`, drivePath);
+            if (fs.existsSync(drivePath)) {
+                pushUnique({
+                    name: `${letter}:`,
+                    path: drivePath,
+                    kind: 'fixed-drive',
+                    driveLetter: `${letter}:`,
+                    volumeLabel: null,
+                    totalBytes: null,
+                    freeBytes: null,
+                    providerName: null,
+                });
+            }
         }
     }
+
     return roots;
-});
+}
+
+ipcMain.handle('fs:getInitialRoots', async () => getStorageRoots());
 
 ipcMain.handle('fs:startWatchingDirectory', async (event, dirPath) => {
     const resolved = path.resolve(dirPath);

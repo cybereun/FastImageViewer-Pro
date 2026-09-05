@@ -1,4 +1,4 @@
-import type { DirectoryContent, FolderNode, ImageFile, ImageMetadata, Preferences } from '../types';
+import type { DirectoryContent, FolderKind, FolderNode, ImageFile, ImageMetadata, Preferences, SpecialFolderKind } from '../types';
 
 export const DEFAULT_IMAGE_METADATA: ImageMetadata = {
   favorite: false,
@@ -38,9 +38,32 @@ export function mergeImageMetadata(current: ImageMetadata, patch: Partial<ImageM
   };
 }
 
+export function inferFolderMetadata(name: string, folderPath: string): {
+  kind: FolderKind;
+  specialKind?: SpecialFolderKind;
+  driveLetter?: string;
+} {
+  const driveMatch = String(folderPath).trim().match(/^([A-Za-z]):\\?$/);
+  if (driveMatch) {
+    return { kind: 'fixed-drive', driveLetter: `${driveMatch[1].toUpperCase()}:` };
+  }
+
+  const specialKinds: Record<string, SpecialFolderKind> = {
+    desktop: 'desktop',
+    downloads: 'downloads',
+    documents: 'documents',
+    pictures: 'pictures',
+    music: 'music',
+    videos: 'videos',
+  };
+  const specialKind = specialKinds[String(name).trim().toLowerCase()];
+  return specialKind ? { kind: 'special', specialKind } : { kind: 'folder' };
+}
+
 export function mapFolders(content: DirectoryContent): FolderNode[] {
   return content.folders
     .map((folder) => ({
+      ...inferFolderMetadata(folder.name, folder.path),
       id: folder.path,
       name: folder.name,
       path: folder.path,

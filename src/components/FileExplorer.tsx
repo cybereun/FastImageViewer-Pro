@@ -1,19 +1,102 @@
 import { useState, useRef } from 'react';
 import {
+  Computer,
+  Database,
+  Disc3,
+  Download,
   Folder,
   FolderOpen,
+  FileText,
   ChevronRight,
   ChevronDown,
+  HardDrive,
+  Home,
+  Image,
+  Music,
+  Network,
+  RefreshCw,
   Upload,
   FolderPlus,
-  HardDrive,
-  Monitor,
+  Usb,
+  Video,
 } from 'lucide-react';
-import type { FolderNode } from '../types';
+import type { FolderKind, FolderNode, SpecialFolderKind } from '../types';
 import { cn } from '../utils/cn';
 import { IMAGE_DRAG_MIME } from '../constants/drag';
 import type { Language } from '../i18n';
 import { t } from '../i18n';
+
+const SPECIAL_FOLDER_LABELS: Record<Language, Record<SpecialFolderKind, string>> = {
+  ko: {
+    desktop: '바탕 화면',
+    downloads: '다운로드',
+    documents: '문서',
+    pictures: '사진',
+    music: '음악',
+    videos: '동영상',
+  },
+  en: {
+    desktop: 'Desktop',
+    downloads: 'Downloads',
+    documents: 'Documents',
+    pictures: 'Pictures',
+    music: 'Music',
+    videos: 'Videos',
+  },
+};
+
+function isDriveKind(kind: FolderKind | undefined): boolean {
+  return Boolean(kind && kind.endsWith('-drive'));
+}
+
+function formatBytes(value: number | null | undefined): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '';
+  if (value < 1024) return `${Math.round(value)} B`;
+  const units = ['KB', 'MB', 'GB', 'TB', 'PB'];
+  let amount = value;
+  let unitIndex = -1;
+  while (amount >= 1024 && unitIndex < units.length - 1) {
+    amount /= 1024;
+    unitIndex += 1;
+  }
+  return `${amount >= 10 || unitIndex === 0 ? Math.round(amount) : amount.toFixed(1)} ${units[unitIndex]}`;
+}
+
+function getNodeLabel(node: FolderNode, language: Language): string {
+  if (node.specialKind) return SPECIAL_FOLDER_LABELS[language][node.specialKind];
+  return node.name;
+}
+
+function getNodeDescription(node: FolderNode, language: Language): string | null {
+  if (!isDriveKind(node.kind)) return null;
+  if (node.totalBytes !== null && node.totalBytes !== undefined && node.freeBytes !== null && node.freeBytes !== undefined) {
+    return language === 'ko'
+      ? `${formatBytes(node.freeBytes)} 여유 · ${formatBytes(node.totalBytes)}`
+      : `${formatBytes(node.freeBytes)} free · ${formatBytes(node.totalBytes)}`;
+  }
+  if (node.providerName) return node.providerName;
+  return language === 'ko' ? '드라이브' : 'Drive';
+}
+
+function FolderGlyph({ node, isSelected }: { node: FolderNode; isSelected: boolean }) {
+  const className = isSelected ? 'text-white' : undefined;
+  const size = 17;
+  if (node.kind === 'fixed-drive' || node.kind === 'unknown-drive') return <HardDrive size={size} className={className ?? 'text-sky-500'} />;
+  if (node.kind === 'removable-drive') return <Usb size={size} className={className ?? 'text-violet-500'} />;
+  if (node.kind === 'cdrom-drive') return <Disc3 size={size} className={className ?? 'text-amber-500'} />;
+  if (node.kind === 'network-drive') return <Network size={size} className={className ?? 'text-emerald-500'} />;
+  if (node.kind === 'ram-drive') return <Database size={size} className={className ?? 'text-rose-500'} />;
+  if (node.specialKind === 'desktop') return <Computer size={size} className={className ?? 'text-sky-400'} />;
+  if (node.specialKind === 'downloads') return <Download size={size} className={className ?? 'text-indigo-400'} />;
+  if (node.specialKind === 'documents') return <FileText size={size} className={className ?? 'text-slate-400'} />;
+  if (node.specialKind === 'pictures') return <Image size={size} className={className ?? 'text-cyan-400'} />;
+  if (node.specialKind === 'music') return <Music size={size} className={className ?? 'text-fuchsia-400'} />;
+  if (node.specialKind === 'videos') return <Video size={size} className={className ?? 'text-red-400'} />;
+  if (node.name.toLowerCase() === 'home') return <Home size={size} className={className ?? 'text-orange-400'} />;
+  return node.isExpanded
+    ? <FolderOpen size={size} className={className ?? 'text-yellow-500'} />
+    : <Folder size={size} className={className ?? 'text-yellow-500'} />;
+}
 
 interface FileExplorerProps {
   folders: FolderNode[];
@@ -27,6 +110,7 @@ interface FileExplorerProps {
   }) => Promise<void> | void;
   onOpenDirectory?: () => void;
   onOpenFiles?: () => void;
+  onRefreshRoots?: () => Promise<void> | void;
   onLoadFiles: (files: FileList | File[]) => void;
   totalCount: number;
   loading: boolean;
@@ -40,6 +124,7 @@ function FolderItem({
   onSelectFolder,
   onToggleFolder,
   onImageDropToFolder,
+  language,
 }: {
   node: FolderNode;
   depth: number;
@@ -51,10 +136,14 @@ function FolderItem({
     targetFolderPath: string;
     move: boolean;
   }) => Promise<void> | void;
+  language: Language;
 }) {
   const isSelected = selectedFolder === node.id;
   const canToggle = node.children.length > 0 || !node.isLoaded;
   const [dropActive, setDropActive] = useState(false);
+  const label = getNodeLabel(node, language);
+  const description = getNodeDescription(node, language);
+  const isDrive = isDriveKind(node.kind);
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -117,7 +206,7 @@ function FolderItem({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleImageDrop}
-        title={dropActive ? 'Drop image here (Ctrl = copy, default = move)' : undefined}
+        title={dropActive ? 'Drop image here (Ctrl = copy, default = move)' : node.path}
       >
         <button
           onClick={handleToggle}
@@ -138,13 +227,16 @@ function FolderItem({
           )}
         </button>
 
-        {node.isExpanded ? (
-          <FolderOpen size={16} className={isSelected ? 'text-yellow-300' : 'text-yellow-500'} />
-        ) : (
-          <Folder size={16} className={isSelected ? 'text-yellow-300' : 'text-yellow-500'} />
-        )}
+        <FolderGlyph node={node} isSelected={isSelected} />
 
-        <span className="flex-1 truncate">{node.name}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate">{label}</span>
+          {isDrive && description && (
+            <span className={cn('block truncate text-[10px]', isSelected ? 'text-white/75' : 'text-gray-500')}>
+              {description}
+            </span>
+          )}
+        </span>
       </div>
 
       {node.isExpanded && (
@@ -158,6 +250,7 @@ function FolderItem({
               onSelectFolder={onSelectFolder}
               onToggleFolder={onToggleFolder}
               onImageDropToFolder={onImageDropToFolder}
+              language={language}
             />
           ))}
           {!node.isLoaded && (
@@ -179,6 +272,7 @@ export function FileExplorer({
   onImageDropToFolder,
   onOpenDirectory,
   onOpenFiles,
+  onRefreshRoots,
   onLoadFiles,
   totalCount,
   loading,
@@ -186,6 +280,17 @@ export function FileExplorer({
 }: FileExplorerProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [refreshingRoots, setRefreshingRoots] = useState(false);
+
+  const handleRefreshRoots = async () => {
+    if (!onRefreshRoots || refreshingRoots) return;
+    setRefreshingRoots(true);
+    try {
+      await onRefreshRoots();
+    } finally {
+      setRefreshingRoots(false);
+    }
+  };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -225,7 +330,7 @@ export function FileExplorer({
     >
       <div className="flex flex-col gap-2 border-b border-gray-800 p-3">
         <div className="flex items-center gap-2 text-gray-400">
-          <Monitor size={16} />
+          <Computer size={16} />
           <span className="text-xs font-semibold uppercase tracking-wider">{t(language, 'storage')}</span>
         </div>
 
@@ -258,8 +363,21 @@ export function FileExplorer({
         }}
       />
 
-      <div className="border-b border-gray-800 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
-        {t(language, 'thisPc')}
+      <div className="flex items-center justify-between border-b border-gray-800 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-gray-500">
+        <span className="flex items-center gap-1.5">
+          <HardDrive size={13} />
+          {t(language, 'thisPc')}
+        </span>
+        <button
+          type="button"
+          onClick={() => void handleRefreshRoots()}
+          disabled={!onRefreshRoots || refreshingRoots}
+          className="rounded p-1 text-gray-500 transition-colors hover:bg-gray-700 hover:text-gray-200 disabled:cursor-default disabled:opacity-50"
+          title={t(language, 'refreshStorage')}
+          aria-label={t(language, 'refreshStorage')}
+        >
+          <RefreshCw size={13} className={refreshingRoots ? 'animate-spin' : undefined} />
+        </button>
       </div>
 
       <div className="scrollbar-thin flex-1 overflow-x-hidden overflow-y-auto py-2">
@@ -273,18 +391,49 @@ export function FileExplorer({
             <p className="text-xs">{t(language, 'noFolders')}</p>
           </div>
         ) : (
-          <div className="space-y-0.5 px-2">
-            {folders.map((node) => (
-              <FolderItem
-                key={node.id}
-                node={node}
-                depth={0}
-                selectedFolder={selectedFolder}
-                onSelectFolder={(id) => onSelectFolder(id)}
-                onToggleFolder={onToggleFolder}
-                onImageDropToFolder={onImageDropToFolder}
-              />
-            ))}
+          <div className="space-y-3 px-2">
+            {folders.some((node) => !isDriveKind(node.kind)) && (
+              <section>
+                <h3 className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                  {t(language, 'quickAccess')}
+                </h3>
+                <div className="space-y-0.5">
+                  {folders.filter((node) => !isDriveKind(node.kind)).map((node) => (
+                    <FolderItem
+                      key={node.id}
+                      node={node}
+                      depth={0}
+                      selectedFolder={selectedFolder}
+                      onSelectFolder={(id) => onSelectFolder(id)}
+                      onToggleFolder={onToggleFolder}
+                      onImageDropToFolder={onImageDropToFolder}
+                      language={language}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+            {folders.some((node) => isDriveKind(node.kind)) && (
+              <section>
+                <h3 className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                  {t(language, 'drives')}
+                </h3>
+                <div className="space-y-0.5">
+                  {folders.filter((node) => isDriveKind(node.kind)).map((node) => (
+                    <FolderItem
+                      key={node.id}
+                      node={node}
+                      depth={0}
+                      selectedFolder={selectedFolder}
+                      onSelectFolder={(id) => onSelectFolder(id)}
+                      onToggleFolder={onToggleFolder}
+                      onImageDropToFolder={onImageDropToFolder}
+                      language={language}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
       </div>

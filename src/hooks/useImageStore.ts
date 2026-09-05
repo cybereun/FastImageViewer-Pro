@@ -7,9 +7,11 @@ import type {
   ImageFile,
   ImageMetadata,
   Preferences,
+  StorageRoot,
 } from '../types';
 import {
   DEFAULT_PREFERENCES,
+  inferFolderMetadata,
   mapFolders,
   mapImages,
   mapImportedFiles,
@@ -45,6 +47,26 @@ function findNodeById(nodes: FolderNode[], targetId: string): FolderNode | null 
 
 function samePath(left: string | null, right: string | null): boolean {
   return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
+}
+
+function mapStorageRoot(root: StorageRoot, previous?: FolderNode): FolderNode {
+  return {
+    ...(previous ?? {
+      children: [],
+      isLoaded: false,
+      isExpanded: false,
+    }),
+    id: root.path,
+    name: root.name,
+    path: root.path,
+    kind: root.kind,
+    specialKind: root.specialKind,
+    driveLetter: root.driveLetter,
+    volumeLabel: root.volumeLabel,
+    totalBytes: root.totalBytes,
+    freeBytes: root.freeBytes,
+    providerName: root.providerName,
+  };
 }
 
 export function useImageStore() {
@@ -170,12 +192,36 @@ export function useImageStore() {
     }
   }, []);
 
+  const refreshRootFolders = useCallback(async () => {
+    try {
+      const roots = await window.electron.getInitialRoots();
+      if (!Array.isArray(roots)) return;
+      setRootFolders((previous) => {
+        const rootPaths = new Set(roots.map((root) => root.path.toLowerCase()));
+        const refreshedRoots = roots.map((root) => {
+          const existing = previous.find((node) => samePath(node.path, root.path));
+          return mapStorageRoot(root, existing);
+        });
+        const openedFolders = previous.filter((node) => !rootPaths.has(node.path.toLowerCase()));
+        return [...refreshedRoots, ...openedFolders];
+      });
+    } catch {
+      // A removable or network drive can disappear while the metadata query
+      // is running. Keep the last known tree until the next refresh succeeds.
+    }
+  }, []);
+
   useEffect(() => {
     const unsubscribe = window.electron.onDirectoryChanged((folderPath) => {
       if (samePath(selectedFolderRef.current, folderPath)) void refreshFolderContent(folderPath);
     });
     return unsubscribe;
   }, [refreshFolderContent]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => void refreshRootFolders(), 15_000);
+    return () => window.clearInterval(timer);
+  }, [refreshRootFolders]);
 
   useEffect(() => {
     let cancelled = false;
@@ -191,14 +237,7 @@ export function useImageStore() {
 
         preferencesRef.current = loadedPreferences;
         setPreferences(loadedPreferences);
-        const rootNodes: FolderNode[] = roots.map((root) => ({
-          id: root.path,
-          name: root.name,
-          path: root.path,
-          children: [],
-          isLoaded: false,
-          isExpanded: false,
-        }));
+        const rootNodes: FolderNode[] = roots.map((root) => mapStorageRoot(root));
         setRootFolders(rootNodes);
 
         const preferredPath = loadedPreferences.defaultFolder && roots.some((root) => samePath(root.path, loadedPreferences.defaultFolder))
@@ -242,6 +281,7 @@ export function useImageStore() {
 
   const openFolderResult = useCallback(async (result: { path: string; name: string; content: DirectoryContent }) => {
       const rootNode: FolderNode = {
+        ...inferFolderMetadata(result.name, result.path),
         id: result.path,
         name: result.name,
         path: result.path,
@@ -464,6 +504,7 @@ export function useImageStore() {
     error,
     openDirectory,
     toggleFolder,
+    refreshRootFolders,
     refreshSelectedFolder,
     updatePreferences,
     updateImageMetadata,

@@ -1,9 +1,7 @@
-# FastImage Pro
+# FastImage 2.0
 
-이 저장소는 FastImage 유료 Pro 배포본과 라이선스 기능을 관리하는 비공개 저장소입니다. 공통 기능 수정은 [Community 저장소](https://github.com/cybereun/FastImageViewer)에서 먼저 반영한 뒤 이 저장소로 병합합니다.
-
-[![Latest Release](https://img.shields.io/github/v/release/cybereun/FastImageViewer-Pro?display_name=tag&sort=semver&style=flat-square)](https://github.com/cybereun/FastImageViewer-Pro/releases/latest)
-[![Build](https://img.shields.io/github/actions/workflow/status/cybereun/FastImageViewer-Pro/release.yml?branch=main&label=build&style=flat-square)](https://github.com/cybereun/FastImageViewer-Pro/actions/workflows/release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/cybereun/FastImageViewer?display_name=tag&sort=semver&style=flat-square)](https://github.com/cybereun/FastImageViewer/releases/latest)
+[![Build](https://img.shields.io/github/actions/workflow/status/cybereun/FastImageViewer/release.yml?branch=main&label=build&style=flat-square)](https://github.com/cybereun/FastImageViewer/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0ea5e9.svg)](https://github.com/cybereun/FastImageViewer)
 
@@ -23,7 +21,8 @@ Windows용 로컬 우선 이미지 브라우저·정리 도구입니다. 폴더�
 
 ## 주요 기능
 
-- Windows 폴더 트리 탐색, 최근 폴더 기억, 폴더 변경 감지
+- Windows 탐색기 스타일 폴더 트리, 시스템 폴더·드라이브 종류별 아이콘, 최근 폴더 기억, 폴더 변경 감지
+- 고정 디스크·USB·CD/DVD·네트워크 드라이브의 볼륨명·드라이브 문자·용량 표시
 - 파일명 검색, 자연 정렬(이름·용량·날짜·평점), 형식·용량·날짜·평점 필터
 - JPG/JPEG, PNG, GIF, BMP, WebP, SVG, ICO, TIFF, AVIF 지원
 - 썸네일 지연 로딩 및 Electron 네이티브 메모리 캐시
@@ -74,14 +73,14 @@ npm run build
 ## Windows 배포 빌드
 
 ```bash
-npm run electron:build:pro
+npm run electron:build
 ```
 
 출력 파일:
 
-- `dist-electron-pro/FastImage-2.1.0-Windows-Portable.exe`
-- `dist-electron-pro/FastImage-2.1.0-Windows-Setup.exe`
-- `dist-electron-pro/win-unpacked/`
+- `dist-electron/FastImage-2.1.0-Windows-Portable.exe`
+- `dist-electron/FastImage-2.1.0-Windows-Setup.exe`
+- `dist-electron/win-unpacked/`
 
 `Windows-Portable.exe`는 설치 없이 실행하는 버전입니다. `Windows-Setup.exe`는 사용자별 설치 방식이며 설치 과정에서 바탕화면과 시작 메뉴에 FastImage 바로가기를 만듭니다.
 

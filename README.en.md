@@ -1,9 +1,7 @@
-# FastImage Pro
+# FastImage 2.0
 
-This private repository manages the paid FastImage Pro distribution and licensing work. Shared fixes are merged from the [Community repository](https://github.com/cybereun/FastImageViewer) before Pro releases.
-
-[![Latest Release](https://img.shields.io/github/v/release/cybereun/FastImageViewer-Pro?display_name=tag&sort=semver&style=flat-square)](https://github.com/cybereun/FastImageViewer-Pro/releases/latest)
-[![Build](https://img.shields.io/github/actions/workflow/status/cybereun/FastImageViewer-Pro/release.yml?branch=main&label=build&style=flat-square)](https://github.com/cybereun/FastImageViewer-Pro/actions/workflows/release.yml)
+[![Latest Release](https://img.shields.io/github/v/release/cybereun/FastImageViewer?display_name=tag&sort=semver&style=flat-square)](https://github.com/cybereun/FastImageViewer/releases/latest)
+[![Build](https://img.shields.io/github/actions/workflow/status/cybereun/FastImageViewer/release.yml?branch=main&label=build&style=flat-square)](https://github.com/cybereun/FastImageViewer/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0ea5e9.svg)](https://github.com/cybereun/FastImageViewer)
 
@@ -26,7 +24,8 @@ The bright, static product site in [FastImage-Web](https://github.com/cybereun/F
 
 ## Features
 
-- Windows folder tree navigation, recent-folder memory, and folder change detection
+- Windows Explorer-style folder tree with system-folder and drive-type icons, recent-folder memory, and folder change detection
+- Volume labels, drive letters, and capacity details for fixed, USB, CD/DVD, and network drives
 - Filename search and natural sorting by name, size, date, or rating
 - JPG/JPEG, PNG, GIF, BMP, WebP, SVG, ICO, TIFF, and AVIF support
 - Lazy-loaded thumbnails with an Electron-native memory cache
@@ -77,14 +76,14 @@ npm run build
 ## Build Windows packages
 
 ~~~
-npm run electron:build:pro
+npm run electron:build
 ~~~
 
 The build produces:
 
-- dist-electron-pro/FastImage-2.1.0-Windows-Portable.exe
-- dist-electron-pro/FastImage-2.1.0-Windows-Setup.exe
-- dist-electron-pro/win-unpacked/
+- dist-electron/FastImage-2.1.0-Windows-Portable.exe
+- dist-electron/FastImage-2.1.0-Windows-Setup.exe
+- dist-electron/win-unpacked/
 
 The portable executable runs without installation. The Setup executable installs per user and creates FastImage shortcuts in the Desktop and Start menu.
 

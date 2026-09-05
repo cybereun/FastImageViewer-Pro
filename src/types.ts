@@ -2,6 +2,31 @@
 export type ImageSource = 'folder' | 'import';
 export type AppEdition = 'community' | 'pro';
 
+/** The storage category used to choose a familiar Explorer-style icon. */
+export type FolderKind =
+  | 'folder'
+  | 'special'
+  | 'fixed-drive'
+  | 'removable-drive'
+  | 'cdrom-drive'
+  | 'network-drive'
+  | 'ram-drive'
+  | 'unknown-drive';
+
+export type SpecialFolderKind = 'desktop' | 'downloads' | 'documents' | 'pictures' | 'music' | 'videos';
+
+export interface StorageRoot {
+  name: string;
+  path: string;
+  kind: FolderKind;
+  specialKind?: SpecialFolderKind;
+  driveLetter?: string;
+  volumeLabel?: string | null;
+  totalBytes?: number | null;
+  freeBytes?: number | null;
+  providerName?: string | null;
+}
+
 export interface ImageMetadata {
   favorite: boolean;
   rating: number;
@@ -32,6 +57,13 @@ export interface FolderNode {
   children: FolderNode[];
   isLoaded: boolean;
   isExpanded: boolean;
+  kind?: FolderKind;
+  specialKind?: SpecialFolderKind;
+  driveLetter?: string;
+  volumeLabel?: string | null;
+  totalBytes?: number | null;
+  freeBytes?: number | null;
+  providerName?: string | null;
   error?: string;
 }
 
@@ -130,7 +162,7 @@ declare global {
       openDirectory: () => Promise<{ path: string; name: string; content: DirectoryContent } | null>;
       chooseDirectory: () => Promise<{ path: string; name: string } | null>;
       readDirectory: (path: string) => Promise<DirectoryContent>;
-      getInitialRoots: () => Promise<Array<{ name: string; path: string }>>;
+      getInitialRoots: () => Promise<StorageRoot[]>;
       toLocalUrl: (filePath: string) => string;
       getThumbnailUrl: (filePath: string, size?: number) => Promise<string>;
       copyImageFile: (sourcePath: string, targetFolderPath: string) => Promise<{ path: string; name: string }>;
