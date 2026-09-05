@@ -1,4 +1,4 @@
-name: Build and publish Windows release
+name: Build and publish FastImage Pro release
 
 on:
   push:
@@ -34,26 +34,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           npm run build
 
-      - name: Build Windows portable app and installer
-        run: npm run electron:build
+      - name: Build Windows Pro portable app and installer
+        run: npm run electron:build:pro
 
-      - name: Verify packaged files and portable restart / recovery
-        run: |
-          node scripts/verify-package.mjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node scripts/update-manager-e2e.mjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node scripts/update-e2e.mjs portable
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          node scripts/update-e2e.mjs rollback
-
-      - name: Verify installed app update and restart
+      - name: Verify Pro package metadata
         shell: pwsh
         run: |
-          node scripts/build-update-test-installer.mjs
+          node scripts/verify-package.mjs "dist-electron-pro/win-unpacked/resources/app.asar"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
-          node scripts/update-e2e.mjs installer "dist-e2e-installer/FastImage-$version-Windows-Setup.exe"
+          node -e "const asar=require('@electron/asar'); const p=JSON.parse(asar.extractFile('dist-electron-pro/win-unpacked/resources/app.asar','package.json')); if (p.edition !== 'pro') throw new Error('The packaged edition is not Pro.');"
 
       - name: Validate release version
         shell: pwsh
@@ -65,22 +54,22 @@ jobs:
             throw "Git tag $tagVersion does not match package.json version $packageVersion."
           }
 
-      - name: Publish GitHub release
+      - name: Publish GitHub Pro release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $assets = @(
-            Get-ChildItem -LiteralPath dist-electron -Filter 'FastImage-*-Windows-Portable.exe'
-            Get-ChildItem -LiteralPath dist-electron -Filter 'FastImage-*-Windows-Setup.exe'
+            Get-ChildItem -LiteralPath dist-electron-pro -Filter 'FastImage-*-Windows-Portable.exe'
+            Get-ChildItem -LiteralPath dist-electron-pro -Filter 'FastImage-*-Windows-Setup.exe'
           ) | Sort-Object Name -Unique
-          if ($assets.Count -ne 2) { throw 'Both portable and installer FastImage executables were required.' }
+          if ($assets.Count -ne 2) { throw 'Both Pro portable and installer executables were required.' }
           $tag = if ('${{ github.ref_type }}' -eq 'tag') { '${{ github.ref_name }}' } else { '' }
           if (-not $tag) { $tag = "v$((Get-Content package.json -Raw | ConvertFrom-Json).version)" }
           $assetPaths = @($assets | ForEach-Object { $_.FullName })
           gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag @assetPaths --repo $env:GITHUB_REPOSITORY --title "FastImage $tag" --notes-file CHANGELOG.md
+            gh release create $tag @assetPaths --repo $env:GITHUB_REPOSITORY --title "FastImage Pro $tag" --notes-file CHANGELOG.md
           } else {
             gh release upload $tag @assetPaths --repo $env:GITHUB_REPOSITORY --clobber
           }

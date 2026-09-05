@@ -1,7 +1,9 @@
-# FastImage 2.0
+# FastImage Pro
 
-[![Latest Release](https://img.shields.io/github/v/release/cybereun/FastImageViewer?display_name=tag&sort=semver&style=flat-square)](https://github.com/cybereun/FastImageViewer/releases/latest)
-[![Build](https://img.shields.io/github/actions/workflow/status/cybereun/FastImageViewer/release.yml?branch=main&label=build&style=flat-square)](https://github.com/cybereun/FastImageViewer/actions/workflows/release.yml)
+This private repository manages the paid FastImage Pro distribution and licensing work. Shared fixes are merged from the [Community repository](https://github.com/cybereun/FastImageViewer) before Pro releases.
+
+[![Latest Release](https://img.shields.io/github/v/release/cybereun/FastImageViewer-Pro?display_name=tag&sort=semver&style=flat-square)](https://github.com/cybereun/FastImageViewer-Pro/releases/latest)
+[![Build](https://img.shields.io/github/actions/workflow/status/cybereun/FastImageViewer-Pro/release.yml?branch=main&label=build&style=flat-square)](https://github.com/cybereun/FastImageViewer-Pro/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0ea5e9.svg)](https://github.com/cybereun/FastImageViewer)
 
@@ -75,14 +77,14 @@ npm run build
 ## Build Windows packages
 
 ~~~
-npm run electron:build
+npm run electron:build:pro
 ~~~
 
 The build produces:
 
-- dist-electron/FastImage-2.1.0-Windows-Portable.exe
-- dist-electron/FastImage-2.1.0-Windows-Setup.exe
-- dist-electron/win-unpacked/
+- dist-electron-pro/FastImage-2.1.0-Windows-Portable.exe
+- dist-electron-pro/FastImage-2.1.0-Windows-Setup.exe
+- dist-electron-pro/win-unpacked/
 
 The portable executable runs without installation. The Setup executable installs per user and creates FastImage shortcuts in the Desktop and Start menu.
 

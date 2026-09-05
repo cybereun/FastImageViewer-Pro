@@ -1,7 +1,9 @@
-# FastImage 2.0
+# FastImage Pro
 
-[![Latest Release](https://img.shields.io/github/v/release/cybereun/FastImageViewer?display_name=tag&sort=semver&style=flat-square)](https://github.com/cybereun/FastImageViewer/releases/latest)
-[![Build](https://img.shields.io/github/actions/workflow/status/cybereun/FastImageViewer/release.yml?branch=main&label=build&style=flat-square)](https://github.com/cybereun/FastImageViewer/actions/workflows/release.yml)
+이 저장소는 FastImage 유료 Pro 배포본과 라이선스 기능을 관리하는 비공개 저장소입니다. 공통 기능 수정은 [Community 저장소](https://github.com/cybereun/FastImageViewer)에서 먼저 반영한 뒤 이 저장소로 병합합니다.
+
+[![Latest Release](https://img.shields.io/github/v/release/cybereun/FastImageViewer-Pro?display_name=tag&sort=semver&style=flat-square)](https://github.com/cybereun/FastImageViewer-Pro/releases/latest)
+[![Build](https://img.shields.io/github/actions/workflow/status/cybereun/FastImageViewer-Pro/release.yml?branch=main&label=build&style=flat-square)](https://github.com/cybereun/FastImageViewer-Pro/actions/workflows/release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-2563EB.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010%2F11-0ea5e9.svg)](https://github.com/cybereun/FastImageViewer)
 
@@ -72,14 +74,14 @@ npm run build
 ## Windows 배포 빌드
 
 ```bash
-npm run electron:build
+npm run electron:build:pro
 ```
 
 출력 파일:
 
-- `dist-electron/FastImage-2.1.0-Windows-Portable.exe`
-- `dist-electron/FastImage-2.1.0-Windows-Setup.exe`
-- `dist-electron/win-unpacked/`
+- `dist-electron-pro/FastImage-2.1.0-Windows-Portable.exe`
+- `dist-electron-pro/FastImage-2.1.0-Windows-Setup.exe`
+- `dist-electron-pro/win-unpacked/`
 
 `Windows-Portable.exe`는 설치 없이 실행하는 버전입니다. `Windows-Setup.exe`는 사용자별 설치 방식이며 설치 과정에서 바탕화면과 시작 메뉴에 FastImage 바로가기를 만듭니다.
 
