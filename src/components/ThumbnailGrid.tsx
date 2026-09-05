@@ -154,11 +154,13 @@ function ParentFolderItem({
   disabled,
   onClick,
   largeIcons = false,
+  simple = false,
 }: {
   language: Language;
   disabled: boolean;
   onClick: () => void;
   largeIcons?: boolean;
+  simple?: boolean;
 }) {
   return (
     <button
@@ -166,23 +168,29 @@ function ParentFolderItem({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'group relative flex min-w-0 overflow-hidden rounded-lg border border-gray-700 bg-gray-800 transition-all hover:border-blue-500 focus:outline-none',
-        largeIcons ? 'flex-row items-start gap-3 p-2' : 'flex-col',
+        'group relative flex min-w-0 overflow-hidden transition-all focus:outline-none',
+        simple
+          ? 'flex-row items-center gap-2 rounded-md border border-transparent px-2 py-0.5 hover:border-gray-700 hover:bg-gray-800'
+          : largeIcons
+            ? 'flex-row items-start gap-3 rounded-lg border border-gray-700 bg-gray-800 p-2 hover:border-blue-500'
+            : 'flex-col rounded-lg border border-gray-700 bg-gray-800 hover:border-blue-500',
         disabled && 'cursor-wait opacity-70'
       )}
       title={language === 'ko' ? '상위 폴더로 이동' : 'Go to parent folder'}
     >
       <div className={cn(
-        'relative flex shrink-0 items-center justify-center overflow-hidden bg-gray-900',
-        largeIcons ? 'h-20 w-20' : 'h-48 w-full'
+        'relative flex shrink-0 items-center justify-center overflow-hidden',
+        simple ? 'h-7 w-7 bg-transparent' : largeIcons ? 'h-20 w-20 bg-gray-900' : 'h-48 w-full bg-gray-900'
       )}>
-        <FolderUp size={largeIcons ? 56 : 68} strokeWidth={1.5} className="text-amber-400 drop-shadow" />
+        <FolderUp size={simple ? 24 : largeIcons ? 56 : 68} strokeWidth={1.5} className="text-amber-400 drop-shadow" />
       </div>
-      <div className={cn('w-full px-2 py-1.5', largeIcons && 'min-w-0 px-0 pt-1')}>
-        <p className="truncate text-left text-xs font-medium text-gray-300">..</p>
-        <p className="truncate text-left text-[11px] text-gray-500">
-          {language === 'ko' ? '상위 폴더' : 'Parent folder'}
-        </p>
+      <div className={cn('w-full px-2 py-1.5', largeIcons && 'min-w-0 px-0 pt-1', simple && 'min-w-0 p-0')}>
+        <p className={cn('truncate text-left font-medium text-gray-300', simple ? 'text-sm' : 'text-xs')}>..</p>
+        {!simple && (
+          <p className="truncate text-left text-[11px] text-gray-500">
+            {language === 'ko' ? '상위 폴더' : 'Parent folder'}
+          </p>
+        )}
       </div>
     </button>
   );
@@ -267,6 +275,77 @@ function LargeIconItem({
           {language === 'ko' ? `${typeLabel} 이미지 파일` : `${typeLabel} image file`}
         </p>
       </div>
+    </button>
+  );
+}
+
+function SimpleListItem({
+  image,
+  index,
+  active,
+  selected,
+  dimmedForCut,
+  disabled,
+  language,
+  onClick,
+  onDoubleClick,
+  onContextMenu,
+  onDragStart,
+  onImageLoad,
+}: {
+  image: ImageFile;
+  index: number;
+  active: boolean;
+  selected: boolean;
+  dimmedForCut: boolean;
+  disabled: boolean;
+  language: Language;
+  onClick: (e: React.MouseEvent, image: ImageFile, index: number) => void;
+  onDoubleClick: (index: number) => void;
+  onContextMenu: (e: React.MouseEvent, image: ImageFile) => void;
+  onDragStart: (e: React.DragEvent, image: ImageFile) => void;
+  onImageLoad?: (image: ImageFile, width: number, height: number) => void;
+}) {
+  const typeLabel = getImageTypeLabel(image);
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      draggable={!disabled}
+      onClick={(event) => onClick(event, image, index)}
+      onDoubleClick={() => onDoubleClick(index)}
+      onContextMenu={(event) => onContextMenu(event, image)}
+      onDragStart={(event) => onDragStart(event, image)}
+      className={cn(
+        'group relative flex min-w-0 items-center gap-2 rounded-md border border-transparent px-2 py-0.5 text-left transition-colors hover:border-gray-700 hover:bg-gray-800 focus:outline-none',
+        selected && 'border-blue-500 bg-blue-950/30 ring-1 ring-blue-500/60',
+        active && 'ring-1 ring-yellow-400/80',
+        dimmedForCut && 'opacity-50',
+        disabled && 'cursor-wait opacity-70'
+      )}
+      title={language === 'ko' ? '클릭하여 선택 · 두 번 클릭하여 열기' : 'Click to select. Double-click to open.'}
+    >
+      <div className="relative flex h-7 w-7 shrink-0 items-center justify-center">
+        <FileImage size={25} strokeWidth={1.25} className="text-gray-300" />
+        <span className="absolute bottom-0 rounded-sm bg-emerald-500 px-0.5 text-[7px] font-bold leading-[10px] text-white shadow">
+          {typeLabel}
+        </span>
+        {getImageMetadata(image).favorite && (
+          <Star size={10} fill="currentColor" className="absolute right-0 top-0 text-amber-500 drop-shadow" />
+        )}
+        {(!image.width || !image.height) && (
+          <img
+            src={image.url}
+            alt=""
+            className="pointer-events-none absolute h-px w-px opacity-0"
+            onLoad={(event) => {
+              const { naturalWidth, naturalHeight } = event.currentTarget;
+              if (naturalWidth > 0 && naturalHeight > 0) onImageLoad?.(image, naturalWidth, naturalHeight);
+            }}
+          />
+        )}
+      </div>
+      <p className="min-w-0 flex-1 truncate text-sm text-gray-300">{image.name}</p>
     </button>
   );
 }
@@ -528,7 +607,7 @@ export function ThumbnailGrid({
   }, [dimensionsById, selectedImages]);
   const activeIndex = activeId ? filtered.findIndex((image) => image.id === activeId) : -1;
   const activeImage = activeIndex >= 0 ? filtered[activeIndex] ?? null : null;
-  const showParentFolder = (viewSize === 'large' || viewSize === 'large-icons')
+  const showParentFolder = (viewSize === 'medium' || viewSize === 'large' || viewSize === 'large-icons')
     && Boolean(getParentFolderPath(currentFolderPath))
     && Boolean(onNavigateUp);
 
@@ -1230,7 +1309,7 @@ export function ThumbnailGrid({
 
   const gridCols = {
     small: 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8',
-    medium: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6',
+    medium: 'grid-cols-1',
     // Preview cards should fill the available width instead of collapsing to
     // four oversized columns.  A 230px minimum matches the reference layout
     // and still adapts cleanly to narrow windows.
@@ -1406,6 +1485,7 @@ export function ThumbnailGrid({
           className={cn(
             'flex-1 content-start overflow-y-auto p-3 auto-rows-min grid gap-2 outline-none',
             gridCols[viewSize],
+            viewSize === 'medium' && 'gap-0.5',
             gridFocused && 'ring-inset ring-2 ring-blue-500/40'
           )}
         >
@@ -1414,11 +1494,28 @@ export function ThumbnailGrid({
               language={language}
               disabled={busy}
               largeIcons={viewSize === 'large-icons'}
+              simple={viewSize === 'medium'}
               onClick={() => onNavigateUp?.()}
             />
           )}
           {filtered.map((image, index) => (
-            viewSize === 'large-icons' ? (
+            viewSize === 'medium' ? (
+              <SimpleListItem
+                key={image.id}
+                image={image}
+                index={index}
+                active={activeId === image.id}
+                selected={selectedIds.has(image.id)}
+                dimmedForCut={cutIdSet.has(image.path)}
+                disabled={busy}
+                language={language}
+                onClick={handleSelectClick}
+                onDoubleClick={openImageByIndex}
+                onContextMenu={handleContextMenu}
+                onDragStart={handleDragStart}
+                onImageLoad={handleImageLoad}
+              />
+            ) : viewSize === 'large-icons' ? (
               <LargeIconItem
                 key={image.id}
                 image={image}
