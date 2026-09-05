@@ -38,3 +38,7 @@ npm run electron:build:pro
 공개 저장소에는 Community 코드와 빌드 기반만 둡니다. Pro 전용 UI·라이선스 검증·결제 연동은 `FastImageViewer-Pro` 비공개 저장소에서 관리하고, Pro 릴리스 workflow는 `npm run electron:build:pro`를 사용합니다. 공통 수정은 공개 저장소에서 먼저 반영한 뒤 Pro 저장소로 병합하고 두 릴리스를 같은 버전으로 발행합니다.
 
 결제 서버 비밀키와 서명키는 소스나 렌더러 번들에 넣지 않고 GitHub Actions Secrets 또는 라이선스 서버에만 보관해야 합니다.
+
+## Pro 업데이트 피드 준비
+
+현재 `FastImageViewer-Pro`는 비공개 저장소이므로 일반 고객의 무인증 클라이언트가 GitHub Releases API를 직접 읽을 수 없습니다. 이 저장소의 Pro 릴리스는 소유자·테스트용으로 보관하고, 판매 전에는 라이선스 토큰을 확인하는 업데이트 게이트웨이(서명된 manifest와 다운로드 URL을 반환하는 서버)를 `pro`의 `releaseApiUrl`로 연결해야 합니다. GitHub PAT를 Pro 앱에 넣어 비공개 저장소를 읽게 하면 키가 유출되므로 사용하지 않습니다.
