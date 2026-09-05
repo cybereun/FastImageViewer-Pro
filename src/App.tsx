@@ -385,6 +385,13 @@ export function App() {
               viewPreferences={viewPreferences}
               onViewPreferencesChange={updatePreferences}
               onSelectionChange={handleSelectionChange}
+              onOpenFolder={() => void openDirectory()}
+              onOpenFiles={() => void openFiles()}
+              onRefresh={() => void refreshSelectedFolder()}
+              onSettings={() => setSettingsOpen(true)}
+              onAbout={() => setAboutOpen(true)}
+              onCheckForUpdates={() => void handleCheckForUpdates()}
+              onClose={() => window.electron.closeWindow()}
               language={preferences.language}
             />
           )}

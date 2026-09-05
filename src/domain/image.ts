@@ -1,6 +1,6 @@
 import type { ImageFile, ImageMetadata } from '../types';
 
-export type ImageSortMode = 'name' | 'size' | 'date' | 'rating';
+export type ImageSortMode = 'name' | 'type' | 'size' | 'date' | 'rating';
 export type SortDirection = 'asc' | 'desc';
 
 export interface ImageFilterOptions {
@@ -48,6 +48,8 @@ export function getImageMetadata(image: ImageFile): ImageMetadata {
 
 function compareImages(left: ImageFile, right: ImageFile, mode: ImageSortMode): number {
   switch (mode) {
+    case 'type':
+      return getImageExtension(left.name).localeCompare(getImageExtension(right.name), undefined, { sensitivity: 'base' });
     case 'size':
       return left.size - right.size;
     case 'date':

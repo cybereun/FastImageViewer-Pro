@@ -9,6 +9,8 @@ import { BatchRenameDialog } from './BatchRenameDialog';
 import { FilterBar, getFilterOptions, type DateFilter, type FormatFilter, type SizeFilter } from './FilterBar';
 import type { Language } from '../i18n';
 import { t } from '../i18n';
+import { BUILD_EDITION } from '../application/edition';
+import { Ribbon, type RibbonProFeature } from './Ribbon';
 
 export interface SelectionSummary {
   count: number;
@@ -46,6 +48,13 @@ interface ThumbnailGridProps {
   onViewPreferencesChange?: (patch: Partial<ViewPreferences>) => void;
   onSelectionChange?: (summary: SelectionSummary) => void;
   language?: Language;
+  onOpenFolder?: () => void;
+  onOpenFiles?: () => void;
+  onRefresh?: () => void;
+  onSettings?: () => void;
+  onAbout?: () => void;
+  onCheckForUpdates?: () => void;
+  onClose?: () => void;
 }
 
 interface ViewPreferences {
@@ -296,6 +305,13 @@ export function ThumbnailGrid({
   onViewPreferencesChange,
   onSelectionChange,
   language = 'en',
+  onOpenFolder,
+  onOpenFiles,
+  onRefresh,
+  onSettings,
+  onAbout,
+  onCheckForUpdates,
+  onClose,
 }: ThumbnailGridProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>(viewPreferences?.sortMode ?? 'name');
@@ -513,7 +529,7 @@ export function ThumbnailGrid({
   }, [onViewPreferencesChange]);
 
   const changeSortMode = useCallback(() => {
-    const modes: SortMode[] = ['name', 'size', 'date', 'rating'];
+    const modes: SortMode[] = ['name', 'type', 'size', 'date', 'rating'];
     const nextMode = modes[(modes.indexOf(sortMode) + 1) % modes.length];
     setSortMode(nextMode);
     onViewPreferencesChange?.({ sortMode: nextMode });
@@ -524,6 +540,33 @@ export function ThumbnailGrid({
     setSortDirection(nextDirection);
     onViewPreferencesChange?.({ sortDirection: nextDirection });
   }, [onViewPreferencesChange, sortDirection]);
+
+  const setSortModeValue = useCallback((nextMode: SortMode) => {
+    setSortMode(nextMode);
+    onViewPreferencesChange?.({ sortMode: nextMode });
+  }, [onViewPreferencesChange]);
+
+  const selectAllImages = useCallback(() => {
+    const nextSelection = selectAll(filtered);
+    setSelectedIds(nextSelection);
+    setAnchorId(filtered[0]?.id ?? null);
+    setActiveId(filtered[0]?.id ?? null);
+  }, [filtered]);
+
+  const invertSelection = useCallback(() => {
+    const nextSelection = new Set(filtered
+      .filter((image) => !selectedIds.has(image.id))
+      .map((image) => image.id));
+    setSelectedIds(nextSelection);
+    setAnchorId(filtered.find((image) => nextSelection.has(image.id))?.id ?? null);
+    setActiveId(filtered.find((image) => nextSelection.has(image.id))?.id ?? null);
+  }, [filtered, selectedIds]);
+
+  const clearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+    setActiveId(null);
+    setAnchorId(null);
+  }, []);
 
   const openImageByIndex = useCallback(
     (filteredIndex: number) => {
@@ -536,6 +579,14 @@ export function ThumbnailGrid({
     },
     [filtered, onImageClick]
   );
+
+  const openActiveImage = useCallback(() => {
+    if (activeIndex >= 0) {
+      openImageByIndex(activeIndex);
+      return;
+    }
+    showStatus('No image selected.');
+  }, [activeIndex, openImageByIndex, showStatus]);
 
   const handleSelectClick = useCallback((e: React.MouseEvent, image: ImageFile) => {
     const multiSelect = e.ctrlKey || e.metaKey;
@@ -654,6 +705,56 @@ export function ThumbnailGrid({
     }
     setDeleteDialog({ images: targets });
   }, [confirmDelete, contextMenu, getActionImages, onDeleteImages, runBatchOperation, showStatus]);
+
+  const deleteSelection = useCallback(() => {
+    const targets = getActionImages().filter((image) => image.source === 'folder' && image.path);
+    if (targets.length === 0) {
+      showStatus('No image selected.');
+      return;
+    }
+    if (!confirmDelete) {
+      void runBatchOperation(targets, (paths) => onDeleteImages(paths), `${targets.length} image(s) moved to Recycle Bin.`);
+      clearSelection();
+      return;
+    }
+    setDeleteDialog({ images: targets });
+  }, [clearSelection, confirmDelete, getActionImages, onDeleteImages, runBatchOperation, showStatus]);
+
+  const renameSelection = useCallback(() => {
+    const targets = getActionImages().filter((image) => image.source === 'folder' && image.path);
+    if (targets.length !== 1) {
+      showStatus('Rename is available for one image at a time.');
+      return;
+    }
+    openRenameDialog(targets[0]);
+  }, [getActionImages, openRenameDialog, showStatus]);
+
+  const batchRenameSelection = useCallback(() => {
+    if (selectedImages.length < 2) {
+      showStatus('Select at least two images to rename together.');
+      return;
+    }
+    setBatchRenameOpen(true);
+  }, [selectedImages.length, showStatus]);
+
+  const handleProFeature = useCallback((feature: RibbonProFeature) => {
+    const labels: Record<RibbonProFeature, string> = language === 'ko'
+      ? {
+          capture: '화면 캡처는 Pro 전용 기능입니다. 도움말의 Pro로 전환에서 라이선스를 확인하세요.',
+          'batch-edit': '일괄 편집과 포맷 변환은 Pro 전용 기능입니다.',
+          'advanced-export': '고급 내보내기는 Pro 전용 기능입니다.',
+          'duplicate-search': '중복 이미지 검색은 Pro 전용 기능입니다.',
+        }
+      : {
+          capture: 'Screen capture is a Pro feature. Use Switch to Pro in Help to activate your license.',
+          'batch-edit': 'Batch editing and format conversion are Pro features.',
+          'advanced-export': 'Advanced export is a Pro feature.',
+          'duplicate-search': 'Duplicate image search is a Pro feature.',
+        };
+    showStatus(BUILD_EDITION === 'pro'
+      ? (language === 'ko' ? 'Pro 모듈은 다음 단계에서 연결됩니다.' : 'The Pro module will be connected in the next step.')
+      : labels[feature]);
+  }, [language, showStatus]);
 
   const submitRename = useCallback(async () => {
     if (!renameDialog) return;
@@ -922,6 +1023,41 @@ export function ThumbnailGrid({
 
   return (
     <div className="flex h-full flex-col bg-gray-950" onKeyDown={handleGridKeyDown}>
+      <Ribbon
+        language={language}
+        edition={BUILD_EDITION}
+        selectedCount={selectedImages.length}
+        itemCount={filtered.length}
+        hasActiveImage={Boolean(activeImage)}
+        viewSize={viewSize}
+        sortMode={sortMode}
+        sortDirection={sortDirection}
+        onOpenFolder={onOpenFolder}
+        onOpenFiles={onOpenFiles}
+        onRefresh={onRefresh}
+        onSettings={onSettings}
+        onAbout={onAbout}
+        onCheckForUpdates={onCheckForUpdates}
+        onClose={onClose}
+        onOpenActive={openActiveImage}
+        onViewSizeChange={changeViewSize}
+        onSortModeChange={setSortModeValue}
+        onSortDirectionChange={(direction) => {
+          setSortDirection(direction);
+          onViewPreferencesChange?.({ sortDirection: direction });
+        }}
+        onSelectAll={selectAllImages}
+        onInvertSelection={invertSelection}
+        onClearSelection={clearSelection}
+        onCopy={() => copyOrCutSelection('copy')}
+        onCut={() => copyOrCutSelection('cut')}
+        onPaste={() => void pasteClipboard()}
+        onRename={renameSelection}
+        onDelete={deleteSelection}
+        onBatchRename={batchRenameSelection}
+        onNotify={showStatus}
+        onProFeature={handleProFeature}
+      />
       <div className="flex items-center gap-3 border-b border-gray-700 bg-gray-900 px-4 py-2">
         <div className="relative flex-1">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -956,7 +1092,7 @@ export function ThumbnailGrid({
             title="Change sort field"
           >
             <ArrowUpDown size={12} />
-            {sortMode === 'name' ? 'Name' : sortMode === 'size' ? 'Size' : sortMode === 'date' ? 'Date' : 'Rating'}
+            {sortMode === 'name' ? 'Name' : sortMode === 'type' ? 'Type' : sortMode === 'size' ? 'Size' : sortMode === 'date' ? 'Date' : 'Rating'}
           </button>
           <button
             onClick={changeSortDirection}

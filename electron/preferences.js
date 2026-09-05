@@ -29,7 +29,7 @@ function normalizePreferences(value) {
     if (source.viewSize === 'small' || source.viewSize === 'medium' || source.viewSize === 'large') {
         result.viewSize = source.viewSize;
     }
-    if (source.sortMode === 'name' || source.sortMode === 'size' || source.sortMode === 'date' || source.sortMode === 'rating') {
+    if (source.sortMode === 'name' || source.sortMode === 'type' || source.sortMode === 'size' || source.sortMode === 'date' || source.sortMode === 'rating') {
         result.sortMode = source.sortMode;
     }
     if (source.sortDirection === 'asc' || source.sortDirection === 'desc') {

@@ -43,6 +43,15 @@ describe('image domain rules', () => {
     ]);
   });
 
+  it('sorts by file type before using the file name as a tie breaker', () => {
+    const result = filterAndSortImages(
+      [image('z.webp', 10, 1), image('a.jpg', 10, 1), image('m.png', 10, 1)],
+      '',
+      'type'
+    );
+    expect(result.map((item) => item.name)).toEqual(['a.jpg', 'm.png', 'z.webp']);
+  });
+
   it('filters by format, size, and modified date', () => {
     const result = filterAndSortImages(
       [image('small.jpg', 500, 100), image('large.png', 2_000_000, 200), image('recent.png', 3_000_000, 300)],

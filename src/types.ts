@@ -98,7 +98,7 @@ export interface CropRect {
 }
 
 export type ViewSize = 'small' | 'medium' | 'large';
-export type SortMode = 'name' | 'size' | 'date' | 'rating';
+export type SortMode = 'name' | 'type' | 'size' | 'date' | 'rating';
 export type SortDirection = 'asc' | 'desc';
 
 export interface Preferences {
