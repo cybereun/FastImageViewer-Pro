@@ -155,20 +155,6 @@ function RibbonGroup({ label, children }: { label: string; children: React.React
   );
 }
 
-function QuickAction({ icon: Icon, label, onClick }: { icon: LucideIcon; label: string; onClick?: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={label}
-      aria-label={label}
-      className="rounded p-1.5 text-gray-400 transition-colors hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-teal-400/70"
-    >
-      <Icon size={15} strokeWidth={1.9} />
-    </button>
-  );
-}
-
 export function Ribbon({
   language,
   edition,
@@ -484,19 +470,6 @@ export function Ribbon({
 
   return (
     <section className="shrink-0 border-b border-gray-700 bg-gray-900/95 text-gray-200 shadow-sm" aria-label={ko ? '리본 도구 모음' : 'Ribbon toolbar'}>
-      <div className="flex h-8 items-center gap-1 border-b border-gray-700/80 bg-gray-950/70 px-2" aria-label={text.groups.quick}>
-        <QuickAction icon={FolderOpen} label={text.openFolder} onClick={onOpenFolder} />
-        <QuickAction icon={FolderPlus} label={text.newFolder} onClick={onNewFolder ?? notifyUnavailable} />
-        <QuickAction icon={Save} label={text.saveAs} onClick={hasActiveImage ? notifyUnavailable : notifyImageRequired} />
-        <QuickAction icon={Printer} label={text.print} onClick={hasActiveImage ? notifyUnavailable : notifyImageRequired} />
-        <div className="mx-1 h-4 w-px bg-gray-700" />
-        <QuickAction icon={RefreshCw} label={text.refresh} onClick={onRefresh} />
-        <QuickAction icon={Settings} label={text.settings} onClick={onSettings} />
-        <div className="ml-auto flex items-center gap-2 text-[10px] text-gray-500">
-          <span>{edition === 'pro' ? 'PRO' : 'COMMUNITY'}</span>
-          <span>{selectedCount > 0 ? `${selectedCount} / ${itemCount}` : `${itemCount}`}</span>
-        </div>
-      </div>
       <nav className="flex h-8 items-end gap-0.5 overflow-x-auto px-2" role="tablist" aria-label={ko ? '리본 탭' : 'Ribbon tabs'}>
         {tabs.map((tab) => {
           const Icon = tab.icon;

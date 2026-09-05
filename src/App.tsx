@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
   AlertCircle,
+  FolderOpen,
+  FolderPlus,
   Info,
   Minus,
   PanelLeft,
   PanelLeftClose,
+  Printer,
   RefreshCw,
+  Save,
   Settings,
   Square,
   SquareStack,
@@ -32,6 +36,37 @@ function getParentFolderPath(folderPath: string | null): string | null {
   if (separator < 0) return null;
   if (separator === 2 && /^[A-Za-z]:/.test(trimmed)) return `${trimmed.slice(0, 2)}\\`;
   return trimmed.slice(0, separator) || null;
+}
+
+function ChromeAction({
+  icon: Icon,
+  label,
+  onClick,
+  disabled = false,
+  danger = false,
+}: {
+  icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
+  label: string;
+  onClick?: () => void;
+  disabled?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+      className={cn(
+        'flex h-7 w-7 items-center justify-center rounded-md text-gray-400 transition-colors focus:outline-none focus:ring-2 focus:ring-teal-400/70',
+        danger ? 'hover:bg-red-600 hover:text-white' : 'hover:bg-gray-700 hover:text-white',
+        disabled && 'cursor-not-allowed opacity-35 hover:bg-transparent hover:text-gray-400',
+      )}
+    >
+      <Icon size={15} strokeWidth={1.9} />
+    </button>
+  );
 }
 
 export function App() {
@@ -190,6 +225,10 @@ export function App() {
     });
   }, [updatePreferences]);
 
+  const handleUnavailableCommand = useCallback(() => {
+    setNotice(preferences.language === 'ko' ? '이 기능은 아직 준비 중입니다.' : 'This command is not available yet.');
+  }, [preferences.language]);
+
   const handleNewFolder = useCallback(async () => {
     if (!selectedFolder) {
       setNotice(preferences.language === 'ko' ? '새 폴더를 만들 폴더를 먼저 선택하세요.' : 'Select a folder before creating a new folder.');
@@ -312,7 +351,79 @@ export function App() {
           }} aria-label={preferences.language === 'ko' ? '닫기' : 'Dismiss'}><X size={16} /></button>
         </div>
       )}
-      <div className="flex min-h-0 flex-1 overflow-hidden">
+      <div
+        className="relative flex h-9 min-h-9 shrink-0 items-center gap-2 border-b border-gray-800 bg-[#1e1e1e] px-2"
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        aria-label={preferences.language === 'ko' ? '빠른 실행 및 창 제어' : 'Quick access and window controls'}
+      >
+        <div className="flex shrink-0 items-center gap-0.5" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <ChromeAction
+            icon={FolderOpen}
+            label={t(preferences.language, 'openFolder')}
+            onClick={() => void openDirectory()}
+          />
+          <ChromeAction
+            icon={FolderPlus}
+            label={preferences.language === 'ko' ? '새 폴더' : 'New folder'}
+            onClick={() => void handleNewFolder()}
+          />
+          <ChromeAction
+            icon={Save}
+            label={preferences.language === 'ko' ? '다른 이름으로 저장' : 'Save as'}
+            onClick={handleUnavailableCommand}
+          />
+          <ChromeAction
+            icon={Printer}
+            label={preferences.language === 'ko' ? '인쇄' : 'Print'}
+            onClick={handleUnavailableCommand}
+          />
+        </div>
+
+        <div className="pointer-events-none absolute left-1/2 top-1/2 w-[40%] -translate-x-1/2 -translate-y-1/2 truncate text-center text-xs text-gray-400">
+          <span className="font-semibold text-gray-200">FastImage</span>
+          {appVersion && <span className="ml-1 text-gray-400">{appVersion}</span>}
+          <span className="ml-2 text-[10px] uppercase tracking-wider text-gray-500">{getEditionLabel(BUILD_EDITION)}</span>
+        </div>
+
+        <div className="flex shrink-0 items-center gap-0.5" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+          <ChromeAction
+            icon={RefreshCw}
+            label={preferences.language === 'ko' ? '현재 폴더 새로고침' : 'Refresh folder'}
+            onClick={() => void refreshSelectedFolder()}
+            disabled={!selectedFolder || loading}
+          />
+          <ChromeAction
+            icon={FolderOpen}
+            label={t(preferences.language, 'openFolder')}
+            onClick={() => void openDirectory()}
+          />
+          <ChromeAction
+            icon={Settings}
+            label={t(preferences.language, 'settings')}
+            onClick={() => setSettingsOpen(true)}
+          />
+          <ChromeAction
+            icon={Info}
+            label={t(preferences.language, 'about')}
+            onClick={() => setAboutOpen(true)}
+          />
+          <div className="mx-1 h-4 w-px bg-gray-700" />
+          <ChromeAction icon={Minus} label={preferences.language === 'ko' ? '최소화' : 'Minimize'} onClick={() => window.electron.minimizeWindow()} />
+          <ChromeAction
+            icon={isMaximized ? SquareStack : Square}
+            label={isMaximized ? (preferences.language === 'ko' ? '복원' : 'Restore') : (preferences.language === 'ko' ? '최대화' : 'Maximize')}
+            onClick={() => window.electron.toggleMaximizeWindow()}
+          />
+          <ChromeAction
+            icon={X}
+            label={preferences.language === 'ko' ? '닫기' : 'Close'}
+            onClick={() => window.electron.closeWindow()}
+            danger
+          />
+        </div>
+      </div>
+
+      <div className="relative flex min-h-0 flex-1 overflow-hidden">
         <div
           className={cn(
             'shrink-0 overflow-hidden border-r border-gray-800 transition-all duration-300 ease-in-out',
@@ -335,109 +446,59 @@ export function App() {
           />
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#0d0d0d]">
-        <div
-          className="flex items-center justify-between gap-2 border-b border-gray-800 bg-[#1e1e1e] px-3 py-2"
-          style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
+        <button
+          type="button"
+          onClick={handleSidebarToggle}
+          className="absolute top-1/2 z-40 flex h-7 w-5 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-gray-600 bg-gray-900 text-gray-400 shadow-lg transition-colors hover:border-teal-400 hover:bg-gray-800 hover:text-white focus:outline-none focus:ring-2 focus:ring-teal-400/70"
+          style={{
+            left: sidebarOpen ? '18rem' : '0.875rem',
+            WebkitAppRegion: 'no-drag',
+          } as React.CSSProperties}
+          title={sidebarOpen ? (preferences.language === 'ko' ? '사이드바 닫기' : 'Hide sidebar') : (preferences.language === 'ko' ? '사이드바 열기' : 'Show sidebar')}
+          aria-label={sidebarOpen ? (preferences.language === 'ko' ? '사이드바 닫기' : 'Hide sidebar') : (preferences.language === 'ko' ? '사이드바 열기' : 'Show sidebar')}
         >
-          <div className="flex min-w-0 items-center gap-2">
-            <button
-              onClick={handleSidebarToggle}
-              className="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-700 hover:text-white"
-              title={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
-              aria-label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
-              style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-            >
-              {sidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeft size={16} />}
-            </button>
-            <div className="mx-1 h-4 w-px bg-gray-700" />
-            <span className="truncate text-sm font-medium text-gray-300" title={selectedFolder ?? selectedFolderLabel}>
-              {selectedFolderLabel}
-            </span>
-            <span className="rounded bg-gray-800 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-500">
-              {collectionKind}
-            </span>
-          </div>
+          {sidebarOpen ? <PanelLeftClose size={12} /> : <PanelLeft size={12} />}
+        </button>
 
-          <div
-            className="flex items-center rounded-md border border-gray-700 bg-[#121212]"
-            style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
-          >
-            <button
-              onClick={() => void refreshSelectedFolder()}
-              className="p-2 text-gray-300 hover:bg-gray-700"
-              title="Refresh folder"
-              aria-label="Refresh folder"
-            >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : undefined} />
-            </button>
-            <button
-              onClick={() => setSettingsOpen(true)}
-              className="p-2 text-gray-300 hover:bg-gray-700"
-              title={t(preferences.language, 'settings')}
-              aria-label={t(preferences.language, 'settings')}
-            >
-              <Settings size={14} />
-            </button>
-            <button
-              onClick={() => setAboutOpen(true)}
-              className="p-2 text-gray-300 hover:bg-gray-700"
-              title={t(preferences.language, 'about')}
-              aria-label={t(preferences.language, 'about')}
-            >
-              <Info size={14} />
-            </button>
-            <div className="h-4 w-px bg-gray-700" />
-            <button onClick={() => window.electron.minimizeWindow()} className="p-2 text-gray-300 hover:bg-gray-700" title="Minimize" aria-label="Minimize">
-              <Minus size={14} />
-            </button>
-            <button onClick={() => window.electron.toggleMaximizeWindow()} className="p-2 text-gray-300 hover:bg-gray-700" title={isMaximized ? 'Restore' : 'Maximize'} aria-label={isMaximized ? 'Restore' : 'Maximize'}>
-              {isMaximized ? <SquareStack size={14} /> : <Square size={14} />}
-            </button>
-            <button onClick={() => window.electron.closeWindow()} className="p-2 text-gray-300 hover:bg-red-600 hover:text-white" title="Close" aria-label="Close">
-              <X size={14} />
-            </button>
-          </div>
-        </div>
-
-        {error && (
-          <div className="flex items-center gap-2 border-b border-red-900/60 bg-red-950/40 px-4 py-2 text-xs text-red-200" role="alert">
-            <AlertCircle size={14} />
-            <span className="truncate">{error}</span>
-          </div>
-        )}
-        <div className="relative flex-1 overflow-hidden">
-          {loading && images.length === 0 ? (
-            <div className="absolute inset-0 flex items-center justify-center text-gray-500">Scanning images…</div>
-          ) : (
-            <ThumbnailGrid
-              images={images}
-              currentFolderPath={selectedFolder}
-              collectionKey={`${collectionKind}:${selectedFolder ?? selectedFolderLabel}`}
-              onImageClick={handleImageClick}
-              onRenameImage={renameImage}
-              onRenameImages={renameImages}
-              onCopyImages={copyImagesToFolder}
-              onMoveImages={moveImagesToFolder}
-              onDeleteImages={deleteImages}
-              confirmDelete={preferences.confirmDelete}
-              onUpdateImageMetadata={updateImageMetadata}
-              viewPreferences={viewPreferences}
-              onViewPreferencesChange={updatePreferences}
-              onSelectionChange={handleSelectionChange}
-              onOpenFolder={() => void openDirectory()}
-              onOpenFiles={() => void openFiles()}
-              onNewFolder={() => void handleNewFolder()}
-              onRefresh={() => void refreshSelectedFolder()}
-              onSettings={() => setSettingsOpen(true)}
-              onAbout={() => setAboutOpen(true)}
-              onCheckForUpdates={() => void handleCheckForUpdates()}
-              onClose={() => window.electron.closeWindow()}
-              onNavigateUp={() => void handleNavigateUp()}
-              language={preferences.language}
-            />
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#0d0d0d]">
+          {error && (
+            <div className="flex items-center gap-2 border-b border-red-900/60 bg-red-950/40 px-4 py-2 text-xs text-red-200" role="alert">
+              <AlertCircle size={14} />
+              <span className="truncate">{error}</span>
+            </div>
           )}
-        </div>
+          <div className="relative flex-1 overflow-hidden">
+            {loading && images.length === 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center text-gray-500">Scanning images…</div>
+            ) : (
+              <ThumbnailGrid
+                images={images}
+                currentFolderPath={selectedFolder}
+                collectionKey={`${collectionKind}:${selectedFolder ?? selectedFolderLabel}`}
+                onImageClick={handleImageClick}
+                onRenameImage={renameImage}
+                onRenameImages={renameImages}
+                onCopyImages={copyImagesToFolder}
+                onMoveImages={moveImagesToFolder}
+                onDeleteImages={deleteImages}
+                confirmDelete={preferences.confirmDelete}
+                onUpdateImageMetadata={updateImageMetadata}
+                viewPreferences={viewPreferences}
+                onViewPreferencesChange={updatePreferences}
+                onSelectionChange={handleSelectionChange}
+                onOpenFolder={() => void openDirectory()}
+                onOpenFiles={() => void openFiles()}
+                onNewFolder={() => void handleNewFolder()}
+                onRefresh={() => void refreshSelectedFolder()}
+                onSettings={() => setSettingsOpen(true)}
+                onAbout={() => setAboutOpen(true)}
+                onCheckForUpdates={() => void handleCheckForUpdates()}
+                onClose={() => window.electron.closeWindow()}
+                onNavigateUp={() => void handleNavigateUp()}
+                language={preferences.language}
+              />
+            )}
+          </div>
         </div>
       </div>
 

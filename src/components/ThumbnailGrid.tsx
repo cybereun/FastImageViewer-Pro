@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { FileImage, Grid3X3, ArrowUpDown, Search, Image as ImageIcon, Star, FolderUp } from 'lucide-react';
+import { FileImage, Grid3X3, ArrowUpDown, Search, Image as ImageIcon, Star, FolderOpen, FolderUp, RefreshCw } from 'lucide-react';
 import type { BatchOperationResult, BatchRenameRequest, ImageFile, ImageMetadata, SortDirection, SortMode, ViewSize } from '../types';
 import { cn } from '../utils/cn';
 import { IMAGE_DRAG_MIME } from '../constants/drag';
@@ -210,6 +210,49 @@ function ParentFolderItem({
         )}
       </div>
     </button>
+  );
+}
+
+function LocationBar({
+  currentFolderPath,
+  language,
+  onNavigateUp,
+  onRefresh,
+}: {
+  currentFolderPath: string | null;
+  language: Language;
+  onNavigateUp?: () => void;
+  onRefresh?: () => void;
+}) {
+  const canNavigateUp = Boolean(getParentFolderPath(currentFolderPath)) && Boolean(onNavigateUp);
+  const locationLabel = currentFolderPath || (language === 'ko' ? '홈' : 'Home');
+  return (
+    <div className="flex h-8 min-h-8 items-center gap-1 border-b border-gray-800 bg-gray-900/90 px-2" aria-label={language === 'ko' ? '현재 폴더 경로' : 'Current folder path'}>
+      <button
+        type="button"
+        onClick={onNavigateUp}
+        disabled={!canNavigateUp}
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-400 transition-colors hover:bg-gray-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+        title={language === 'ko' ? '상위 폴더' : 'Parent folder'}
+        aria-label={language === 'ko' ? '상위 폴더' : 'Parent folder'}
+      >
+        <FolderUp size={14} />
+      </button>
+      <div className="flex min-w-0 flex-1 items-center gap-2 rounded border border-gray-700 bg-gray-800 px-2 py-1 text-xs text-gray-300">
+        <FolderOpen size={14} className="shrink-0 text-amber-400" />
+        <span className="truncate" title={currentFolderPath ?? undefined}>{locationLabel}</span>
+      </div>
+      <button
+        type="button"
+        onClick={onRefresh}
+        disabled={!onRefresh}
+        className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-gray-400 transition-colors hover:bg-gray-800 hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+        title={language === 'ko' ? '현재 폴더 새로고침' : 'Refresh folder'}
+        aria-label={language === 'ko' ? '현재 폴더 새로고침' : 'Refresh folder'}
+      >
+        <RefreshCw size={14} />
+      </button>
+    </div>
   );
 }
 
@@ -1658,6 +1701,12 @@ export function ThumbnailGrid({
         onBatchRename={batchRenameSelection}
         onNotify={showStatus}
         onProFeature={handleProFeature}
+      />
+      <LocationBar
+        currentFolderPath={currentFolderPath}
+        language={language}
+        onNavigateUp={onNavigateUp}
+        onRefresh={onRefresh}
       />
       <div className="flex items-center gap-3 border-b border-gray-700 bg-gray-900 px-4 py-2">
         <div className="relative flex-1">
