@@ -388,7 +388,7 @@ export function Ribbon({
           <RibbonGroup label={text.groups.viewFormat}>
             <RibbonButton icon={Eye} label={text.preview} active={viewSize === 'large'} onClick={() => setViewMode('large')} compact />
             <RibbonButton icon={LayoutGrid} label={text.simple} active={viewSize === 'medium'} onClick={() => setViewMode('medium')} compact />
-            <RibbonButton icon={Grid3X3} label={text.largeIcons} active={viewSize === 'small'} onClick={() => setViewMode('small')} compact />
+            <RibbonButton icon={Grid3X3} label={text.largeIcons} active={viewSize === 'large-icons'} onClick={() => setViewMode('large-icons')} compact />
             <RibbonButton icon={List} label={text.details} active={viewSize === 'small'} onClick={() => setViewMode('small')} compact />
             <RibbonButton icon={Film} label={text.filmstrip} active={viewSize === 'large'} onClick={() => setViewMode('large')} compact />
           </RibbonGroup>

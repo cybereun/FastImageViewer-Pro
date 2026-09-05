@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { Grid3X3, ArrowUpDown, Search, Image as ImageIcon, Star, FolderUp } from 'lucide-react';
+import { FileImage, Grid3X3, ArrowUpDown, Search, Image as ImageIcon, Star, FolderUp } from 'lucide-react';
 import type { BatchOperationResult, BatchRenameRequest, ImageFile, ImageMetadata, SortDirection, SortMode, ViewSize } from '../types';
 import { cn } from '../utils/cn';
 import { IMAGE_DRAG_MIME } from '../constants/drag';
@@ -153,10 +153,12 @@ function ParentFolderItem({
   language,
   disabled,
   onClick,
+  largeIcons = false,
 }: {
   language: Language;
   disabled: boolean;
   onClick: () => void;
+  largeIcons?: boolean;
 }) {
   return (
     <button
@@ -164,18 +166,105 @@ function ParentFolderItem({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        'group relative flex min-w-0 flex-col overflow-hidden rounded-lg border border-gray-700 bg-gray-800 transition-all hover:border-blue-500 focus:outline-none',
+        'group relative flex min-w-0 overflow-hidden rounded-lg border border-gray-700 bg-gray-800 transition-all hover:border-blue-500 focus:outline-none',
+        largeIcons ? 'flex-row items-start gap-3 p-2' : 'flex-col',
         disabled && 'cursor-wait opacity-70'
       )}
       title={language === 'ko' ? '상위 폴더로 이동' : 'Go to parent folder'}
     >
-      <div className="relative flex h-48 w-full items-center justify-center overflow-hidden bg-gray-900">
-        <FolderUp size={68} strokeWidth={1.5} className="text-amber-400 drop-shadow" />
+      <div className={cn(
+        'relative flex shrink-0 items-center justify-center overflow-hidden bg-gray-900',
+        largeIcons ? 'h-20 w-20' : 'h-48 w-full'
+      )}>
+        <FolderUp size={largeIcons ? 56 : 68} strokeWidth={1.5} className="text-amber-400 drop-shadow" />
       </div>
-      <div className="w-full px-2 py-1.5">
+      <div className={cn('w-full px-2 py-1.5', largeIcons && 'min-w-0 px-0 pt-1')}>
         <p className="truncate text-left text-xs font-medium text-gray-300">..</p>
         <p className="truncate text-left text-[11px] text-gray-500">
           {language === 'ko' ? '상위 폴더' : 'Parent folder'}
+        </p>
+      </div>
+    </button>
+  );
+}
+
+function getImageTypeLabel(image: ImageFile): string {
+  const extension = image.name.match(/\.([^.]+)$/)?.[1];
+  const mimeType = image.type.split('/')[1];
+  return (extension || mimeType || 'IMG').replace('jpeg', 'jpg').toUpperCase();
+}
+
+function LargeIconItem({
+  image,
+  index,
+  active,
+  selected,
+  dimmedForCut,
+  disabled,
+  language,
+  onClick,
+  onDoubleClick,
+  onContextMenu,
+  onDragStart,
+  onImageLoad,
+}: {
+  image: ImageFile;
+  index: number;
+  active: boolean;
+  selected: boolean;
+  dimmedForCut: boolean;
+  disabled: boolean;
+  language: Language;
+  onClick: (e: React.MouseEvent, image: ImageFile, index: number) => void;
+  onDoubleClick: (index: number) => void;
+  onContextMenu: (e: React.MouseEvent, image: ImageFile) => void;
+  onDragStart: (e: React.DragEvent, image: ImageFile) => void;
+  onImageLoad?: (image: ImageFile, width: number, height: number) => void;
+}) {
+  const typeLabel = getImageTypeLabel(image);
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      draggable={!disabled}
+      onClick={(event) => onClick(event, image, index)}
+      onDoubleClick={() => onDoubleClick(index)}
+      onContextMenu={(event) => onContextMenu(event, image)}
+      onDragStart={(event) => onDragStart(event, image)}
+      className={cn(
+        'group relative flex min-w-0 items-start gap-3 rounded-md border border-transparent p-2 text-left transition-colors hover:border-gray-400 hover:bg-gray-800 focus:outline-none',
+        selected && 'border-blue-500 bg-blue-950/30 ring-2 ring-blue-500/60',
+        active && 'ring-2 ring-yellow-400/80',
+        dimmedForCut && 'opacity-50',
+        disabled && 'cursor-wait opacity-70'
+      )}
+      title={language === 'ko' ? '클릭하여 선택 · 두 번 클릭하여 열기' : 'Click to select. Double-click to open.'}
+    >
+      <div className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded border border-gray-400 bg-gray-100">
+        <FileImage size={52} strokeWidth={1.25} className="text-gray-300" />
+        <span className="absolute bottom-1 rounded-sm bg-emerald-500 px-1 text-[10px] font-bold leading-4 text-white shadow">
+          {typeLabel}
+        </span>
+        {getImageMetadata(image).favorite && (
+          <Star size={13} fill="currentColor" className="absolute right-1 top-1 text-amber-500 drop-shadow" />
+        )}
+        {(!image.width || !image.height) && (
+          <img
+            src={image.url}
+            alt=""
+            className="pointer-events-none absolute h-px w-px opacity-0"
+            onLoad={(event) => {
+              const { naturalWidth, naturalHeight } = event.currentTarget;
+              if (naturalWidth > 0 && naturalHeight > 0) onImageLoad?.(image, naturalWidth, naturalHeight);
+            }}
+          />
+        )}
+      </div>
+      <div className="min-w-0 flex-1 pt-0.5">
+        <p className="truncate text-sm font-medium text-gray-300">{image.name}</p>
+        <p className="mt-1 text-xs text-gray-400">{formatSize(image.size)}</p>
+        <p className="mt-1 truncate text-xs text-gray-500">
+          {language === 'ko' ? `${typeLabel} 이미지 파일` : `${typeLabel} image file`}
         </p>
       </div>
     </button>
@@ -272,6 +361,7 @@ function ThumbnailItem({
     // height so portrait and landscape photos can be compared in one row,
     // while object-contain below preserves each image's natural ratio.
     large: 'h-48',
+    'large-icons': 'h-20',
   };
 
   return (
@@ -438,7 +528,9 @@ export function ThumbnailGrid({
   }, [dimensionsById, selectedImages]);
   const activeIndex = activeId ? filtered.findIndex((image) => image.id === activeId) : -1;
   const activeImage = activeIndex >= 0 ? filtered[activeIndex] ?? null : null;
-  const showParentFolder = viewSize === 'large' && Boolean(getParentFolderPath(currentFolderPath)) && Boolean(onNavigateUp);
+  const showParentFolder = (viewSize === 'large' || viewSize === 'large-icons')
+    && Boolean(getParentFolderPath(currentFolderPath))
+    && Boolean(onNavigateUp);
 
   const showStatus = useCallback((message: string) => {
     setStatusMessage(message);
@@ -1143,6 +1235,7 @@ export function ThumbnailGrid({
     // four oversized columns.  A 230px minimum matches the reference layout
     // and still adapts cleanly to narrow windows.
     large: 'grid-cols-[repeat(auto-fill,minmax(230px,1fr))]',
+    'large-icons': 'grid-cols-[repeat(auto-fill,minmax(340px,1fr))]',
   };
 
   const menuPosition = useMemo(() => {
@@ -1320,25 +1413,44 @@ export function ThumbnailGrid({
             <ParentFolderItem
               language={language}
               disabled={busy}
+              largeIcons={viewSize === 'large-icons'}
               onClick={() => onNavigateUp?.()}
             />
           )}
           {filtered.map((image, index) => (
-            <ThumbnailItem
-              key={image.id}
-              image={image}
-              index={index}
-              active={activeId === image.id}
-              selected={selectedIds.has(image.id)}
-              dimmedForCut={cutIdSet.has(image.path)}
-              disabled={busy}
-              viewSize={viewSize}
-              onClick={handleSelectClick}
-              onDoubleClick={openImageByIndex}
-              onContextMenu={handleContextMenu}
-              onDragStart={handleDragStart}
-              onImageLoad={handleImageLoad}
-            />
+            viewSize === 'large-icons' ? (
+              <LargeIconItem
+                key={image.id}
+                image={image}
+                index={index}
+                active={activeId === image.id}
+                selected={selectedIds.has(image.id)}
+                dimmedForCut={cutIdSet.has(image.path)}
+                disabled={busy}
+                language={language}
+                onClick={handleSelectClick}
+                onDoubleClick={openImageByIndex}
+                onContextMenu={handleContextMenu}
+                onDragStart={handleDragStart}
+                onImageLoad={handleImageLoad}
+              />
+            ) : (
+              <ThumbnailItem
+                key={image.id}
+                image={image}
+                index={index}
+                active={activeId === image.id}
+                selected={selectedIds.has(image.id)}
+                dimmedForCut={cutIdSet.has(image.path)}
+                disabled={busy}
+                viewSize={viewSize}
+                onClick={handleSelectClick}
+                onDoubleClick={openImageByIndex}
+                onContextMenu={handleContextMenu}
+                onDragStart={handleDragStart}
+                onImageLoad={handleImageLoad}
+              />
+            )
           ))}
         </div>
       ) : images.length > 0 ? (

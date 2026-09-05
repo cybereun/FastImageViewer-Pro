@@ -97,7 +97,7 @@ export interface CropRect {
   height: number;
 }
 
-export type ViewSize = 'small' | 'medium' | 'large';
+export type ViewSize = 'small' | 'medium' | 'large' | 'large-icons';
 export type SortMode = 'name' | 'type' | 'size' | 'date' | 'rating';
 export type SortDirection = 'asc' | 'desc';
 
