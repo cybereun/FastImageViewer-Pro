@@ -98,6 +98,23 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function formatModifiedDate(timestamp: number, language: Language): string {
+  const date = new Date(timestamp);
+  if (!Number.isFinite(timestamp) || Number.isNaN(date.getTime())) return '—';
+  const datePart = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  if (language === 'ko') {
+    const hour = date.getHours();
+    const period = hour >= 12 ? '오후' : '오전';
+    const hour12 = hour % 12 || 12;
+    return `${datePart} ${period} ${hour12}:${minutes}`;
+  }
+  const hour = date.getHours();
+  const period = hour >= 12 ? 'PM' : 'AM';
+  const hour12 = hour % 12 || 12;
+  return `${datePart} ${hour12}:${minutes} ${period}`;
+}
+
 const THUMBNAIL_SIZE = 320;
 const MAX_RENDERER_THUMBNAILS = 400;
 const thumbnailCache = new Map<string, string>();
@@ -346,6 +363,135 @@ function SimpleListItem({
         )}
       </div>
       <p className="min-w-0 flex-1 truncate text-sm text-gray-300">{image.name}</p>
+    </button>
+  );
+}
+
+const DETAILS_GRID_COLUMNS = 'grid-cols-[minmax(240px,1fr)_110px_minmax(140px,200px)_minmax(170px,220px)]';
+
+function DetailsListHeader({ language }: { language: Language }) {
+  return (
+    <div className={cn(
+      'sticky top-0 z-10 grid min-w-[720px] items-center gap-3 border-b border-gray-700 bg-gray-900 px-2 py-1 text-xs font-medium text-gray-300',
+      DETAILS_GRID_COLUMNS
+    )}>
+      <span>{language === 'ko' ? '이름' : 'Name'}</span>
+      <span>{language === 'ko' ? '크기' : 'Size'}</span>
+      <span>{language === 'ko' ? '종류' : 'Type'}</span>
+      <span>{language === 'ko' ? '수정한 날짜' : 'Date modified'}</span>
+    </div>
+  );
+}
+
+function DetailsParentFolderItem({
+  language,
+  disabled,
+  onClick,
+}: {
+  language: Language;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'grid w-full min-w-[720px] items-center gap-3 rounded-md border border-transparent px-2 py-0.5 text-left transition-colors hover:border-gray-700 hover:bg-gray-800 focus:outline-none',
+        DETAILS_GRID_COLUMNS,
+        disabled && 'cursor-wait opacity-70'
+      )}
+      title={language === 'ko' ? '상위 폴더로 이동' : 'Go to parent folder'}
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+          <FolderUp size={24} strokeWidth={1.5} className="text-amber-400 drop-shadow" />
+        </span>
+        <span className="truncate text-sm font-medium text-gray-300">..</span>
+      </span>
+      <span aria-hidden="true" />
+      <span aria-hidden="true" />
+      <span aria-hidden="true" />
+    </button>
+  );
+}
+
+function DetailsListItem({
+  image,
+  index,
+  active,
+  selected,
+  dimmedForCut,
+  disabled,
+  language,
+  onClick,
+  onDoubleClick,
+  onContextMenu,
+  onDragStart,
+  onImageLoad,
+}: {
+  image: ImageFile;
+  index: number;
+  active: boolean;
+  selected: boolean;
+  dimmedForCut: boolean;
+  disabled: boolean;
+  language: Language;
+  onClick: (e: React.MouseEvent, image: ImageFile, index: number) => void;
+  onDoubleClick: (index: number) => void;
+  onContextMenu: (e: React.MouseEvent, image: ImageFile) => void;
+  onDragStart: (e: React.DragEvent, image: ImageFile) => void;
+  onImageLoad?: (image: ImageFile, width: number, height: number) => void;
+}) {
+  const typeLabel = getImageTypeLabel(image);
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      draggable={!disabled}
+      onClick={(event) => onClick(event, image, index)}
+      onDoubleClick={() => onDoubleClick(index)}
+      onContextMenu={(event) => onContextMenu(event, image)}
+      onDragStart={(event) => onDragStart(event, image)}
+      className={cn(
+        'grid w-full min-w-[720px] items-center gap-3 rounded-md border border-transparent px-2 py-0.5 text-left transition-colors hover:border-gray-700 hover:bg-gray-800 focus:outline-none',
+        DETAILS_GRID_COLUMNS,
+        selected && 'border-blue-500 bg-blue-950/30 ring-1 ring-blue-500/60',
+        active && 'ring-1 ring-yellow-400/80',
+        dimmedForCut && 'opacity-50',
+        disabled && 'cursor-wait opacity-70'
+      )}
+      title={language === 'ko' ? '클릭하여 선택 · 두 번 클릭하여 열기' : 'Click to select. Double-click to open.'}
+    >
+      <span className="flex min-w-0 items-center gap-2">
+        <span className="relative flex h-7 w-7 shrink-0 items-center justify-center">
+          <FileImage size={25} strokeWidth={1.25} className="text-gray-300" />
+          <span className="absolute bottom-0 rounded-sm bg-emerald-500 px-0.5 text-[7px] font-bold leading-[10px] text-white shadow">
+            {typeLabel}
+          </span>
+          {getImageMetadata(image).favorite && (
+            <Star size={10} fill="currentColor" className="absolute right-0 top-0 text-amber-500 drop-shadow" />
+          )}
+          {(!image.width || !image.height) && (
+            <img
+              src={image.url}
+              alt=""
+              className="pointer-events-none absolute h-px w-px opacity-0"
+              onLoad={(event) => {
+                const { naturalWidth, naturalHeight } = event.currentTarget;
+                if (naturalWidth > 0 && naturalHeight > 0) onImageLoad?.(image, naturalWidth, naturalHeight);
+              }}
+            />
+          )}
+        </span>
+        <span className="min-w-0 truncate text-sm text-gray-300">{image.name}</span>
+      </span>
+      <span className="truncate text-sm text-gray-400">{formatSize(image.size)}</span>
+      <span className="truncate text-sm text-gray-400">
+        {language === 'ko' ? `${typeLabel} 이미지 파일` : `${typeLabel} image file`}
+      </span>
+      <span className="truncate text-sm text-gray-400">{formatModifiedDate(image.lastModified, language)}</span>
     </button>
   );
 }
@@ -607,7 +753,7 @@ export function ThumbnailGrid({
   }, [dimensionsById, selectedImages]);
   const activeIndex = activeId ? filtered.findIndex((image) => image.id === activeId) : -1;
   const activeImage = activeIndex >= 0 ? filtered[activeIndex] ?? null : null;
-  const showParentFolder = (viewSize === 'medium' || viewSize === 'large' || viewSize === 'large-icons')
+  const showParentFolder = (viewSize === 'small' || viewSize === 'medium' || viewSize === 'large' || viewSize === 'large-icons')
     && Boolean(getParentFolderPath(currentFolderPath))
     && Boolean(onNavigateUp);
 
@@ -1308,7 +1454,7 @@ export function ThumbnailGrid({
   );
 
   const gridCols = {
-    small: 'grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8',
+    small: 'grid-cols-1',
     medium: 'grid-cols-1',
     // Preview cards should fill the available width instead of collapsing to
     // four oversized columns.  A 230px minimum matches the reference layout
@@ -1483,23 +1629,48 @@ export function ThumbnailGrid({
             }
           }}
           className={cn(
-            'flex-1 content-start overflow-y-auto p-3 auto-rows-min grid gap-2 outline-none',
+            'flex-1 content-start overflow-auto p-3 auto-rows-min grid gap-2 outline-none',
             gridCols[viewSize],
-            viewSize === 'medium' && 'gap-0.5',
+            (viewSize === 'small' || viewSize === 'medium') && 'gap-0.5',
             gridFocused && 'ring-inset ring-2 ring-blue-500/40'
           )}
         >
+          {viewSize === 'small' && <DetailsListHeader language={language} />}
           {showParentFolder && (
-            <ParentFolderItem
-              language={language}
-              disabled={busy}
-              largeIcons={viewSize === 'large-icons'}
-              simple={viewSize === 'medium'}
-              onClick={() => onNavigateUp?.()}
-            />
+            viewSize === 'small' ? (
+              <DetailsParentFolderItem
+                language={language}
+                disabled={busy}
+                onClick={() => onNavigateUp?.()}
+              />
+            ) : (
+              <ParentFolderItem
+                language={language}
+                disabled={busy}
+                largeIcons={viewSize === 'large-icons'}
+                simple={viewSize === 'medium'}
+                onClick={() => onNavigateUp?.()}
+              />
+            )
           )}
           {filtered.map((image, index) => (
-            viewSize === 'medium' ? (
+            viewSize === 'small' ? (
+              <DetailsListItem
+                key={image.id}
+                image={image}
+                index={index}
+                active={activeId === image.id}
+                selected={selectedIds.has(image.id)}
+                dimmedForCut={cutIdSet.has(image.path)}
+                disabled={busy}
+                language={language}
+                onClick={handleSelectClick}
+                onDoubleClick={openImageByIndex}
+                onContextMenu={handleContextMenu}
+                onDragStart={handleDragStart}
+                onImageLoad={handleImageLoad}
+              />
+            ) : viewSize === 'medium' ? (
               <SimpleListItem
                 key={image.id}
                 image={image}
