@@ -50,6 +50,10 @@ interface ThumbnailGridProps {
   language?: Language;
   onOpenFolder?: () => void;
   onOpenFiles?: () => void;
+  onNewFolder?: () => void;
+  onCopyToFolder?: () => void;
+  onMoveToFolder?: () => void;
+  onToggleFavorite?: () => void;
   onRefresh?: () => void;
   onSettings?: () => void;
   onAbout?: () => void;
@@ -307,6 +311,10 @@ export function ThumbnailGrid({
   language = 'en',
   onOpenFolder,
   onOpenFiles,
+  onNewFolder,
+  onCopyToFolder,
+  onMoveToFolder,
+  onToggleFavorite,
   onRefresh,
   onSettings,
   onAbout,
@@ -679,6 +687,47 @@ export function ThumbnailGrid({
     );
   }, [chooseTargetFolder, contextMenu, getActionImages, onMoveImages, runBatchOperation]);
 
+  const copySelectionToFolder = useCallback(async () => {
+    const targets = getActionImages().filter((image) => image.source === 'folder' && image.path);
+    if (targets.length === 0) {
+      showStatus('No saved image selected. Imported files must be saved first.');
+      return;
+    }
+    const targetFolderPath = await chooseTargetFolder();
+    if (!targetFolderPath) return;
+    await runBatchOperation(
+      targets,
+      (paths) => onCopyImages(paths, targetFolderPath),
+      `${targets.length} image(s) copied.`
+    );
+  }, [chooseTargetFolder, getActionImages, onCopyImages, runBatchOperation, showStatus]);
+
+  const moveSelectionToFolder = useCallback(async () => {
+    const targets = getActionImages().filter((image) => image.source === 'folder' && image.path);
+    if (targets.length === 0) {
+      showStatus('No saved image selected. Imported files must be saved first.');
+      return;
+    }
+    const targetFolderPath = await chooseTargetFolder();
+    if (!targetFolderPath) return;
+    await runBatchOperation(
+      targets,
+      (paths) => onMoveImages(paths, targetFolderPath),
+      `${targets.length} image(s) moved.`
+    );
+  }, [chooseTargetFolder, getActionImages, onMoveImages, runBatchOperation, showStatus]);
+
+  const toggleFavoriteSelection = useCallback(() => {
+    const targets = getActionImages();
+    if (targets.length === 0) {
+      showStatus('No image selected.');
+      return;
+    }
+    const shouldRemove = targets.every((image) => getImageMetadata(image).favorite);
+    targets.forEach((image) => onUpdateImageMetadata(image.id, { favorite: !shouldRemove }));
+    showStatus(shouldRemove ? `${targets.length} image(s) removed from favorites.` : `${targets.length} image(s) added to favorites.`);
+  }, [getActionImages, onUpdateImageMetadata, showStatus]);
+
   const handleRenameFromMenu = useCallback(() => {
     if (!contextMenu) return;
     const targets = getActionImages(contextMenu.image).filter((image) => image.source === 'folder' && image.path);
@@ -1034,6 +1083,10 @@ export function ThumbnailGrid({
         sortDirection={sortDirection}
         onOpenFolder={onOpenFolder}
         onOpenFiles={onOpenFiles}
+        onNewFolder={onNewFolder}
+        onCopyToFolder={onCopyToFolder ?? copySelectionToFolder}
+        onMoveToFolder={onMoveToFolder ?? moveSelectionToFolder}
+        onToggleFavorite={onToggleFavorite ?? toggleFavoriteSelection}
         onRefresh={onRefresh}
         onSettings={onSettings}
         onAbout={onAbout}

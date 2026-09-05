@@ -171,6 +171,7 @@ declare global {
       openDirectory: () => Promise<{ path: string; name: string; content: DirectoryContent } | null>;
       chooseDirectory: () => Promise<{ path: string; name: string } | null>;
       readDirectory: (path: string) => Promise<DirectoryContent>;
+      createDirectory: (parentPath: string, directoryName: string) => Promise<{ path: string; name: string }>;
       getInitialRoots: () => Promise<StorageRoot[]>;
       toLocalUrl: (filePath: string) => string;
       getThumbnailUrl: (filePath: string, size?: number) => Promise<string>;

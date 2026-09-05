@@ -50,6 +50,7 @@ import {
 import type { AppEdition, SortDirection, SortMode, ViewSize } from '../types';
 import type { Language } from '../i18n';
 import { cn } from '../utils/cn';
+import { ProUpgradeDialog } from './ProUpgradeDialog';
 
 export type RibbonTabId = 'file' | 'home' | 'edit' | 'view' | 'tools' | 'help';
 export type RibbonProFeature = 'capture' | 'batch-edit' | 'advanced-export' | 'duplicate-search';
@@ -65,6 +66,10 @@ interface RibbonProps {
   sortDirection: SortDirection;
   onOpenFolder?: () => void;
   onOpenFiles?: () => void;
+  onNewFolder?: () => void;
+  onCopyToFolder?: () => void;
+  onMoveToFolder?: () => void;
+  onToggleFavorite?: () => void;
   onRefresh?: () => void;
   onSettings?: () => void;
   onAbout?: () => void;
@@ -175,6 +180,10 @@ export function Ribbon({
   sortDirection,
   onOpenFolder,
   onOpenFiles,
+  onNewFolder,
+  onCopyToFolder,
+  onMoveToFolder,
+  onToggleFavorite,
   onRefresh,
   onSettings,
   onAbout,
@@ -198,6 +207,7 @@ export function Ribbon({
 }: RibbonProps) {
   const ko = language === 'ko';
   const [activeTab, setActiveTab] = useState<RibbonTabId>('home');
+  const [proDialogFeature, setProDialogFeature] = useState<RibbonProFeature | null>(null);
 
   const text = {
     tabs: {
@@ -268,6 +278,7 @@ export function Ribbon({
     refresh: ko ? '새로고침' : 'Refresh',
     batchEdit: ko ? '일괄 편집' : 'Batch edit',
     convert: ko ? '포맷 변환' : 'Convert format',
+    copyToFolder: ko ? '폴더로 복사' : 'Copy to folder',
     move: ko ? '파일 이동' : 'Move files',
     metadata: ko ? '메타데이터' : 'Metadata',
     capture: ko ? '화면 캡처' : 'Screen capture',
@@ -285,8 +296,7 @@ export function Ribbon({
   const notifyImageRequired = () => onNotify?.(text.noImage);
   const runProFeature = (feature: RibbonProFeature) => {
     if (edition !== 'pro') {
-      onProFeature?.(feature);
-      if (!onProFeature) onNotify?.(text.proOnly);
+      setProDialogFeature(feature);
       return;
     }
     onProFeature?.(feature);
@@ -346,7 +356,7 @@ export function Ribbon({
           <RibbonGroup label={text.groups.connect}>
             <RibbonButton icon={FolderOpen} label={text.openFolder} shortcut="Ctrl+O" onClick={onOpenFolder} />
             <RibbonButton icon={Image} label={text.openImages} shortcut="Ctrl+Shift+O" onClick={onOpenFiles} />
-            <RibbonButton icon={FolderPlus} label={text.newFolder} onClick={notifyUnavailable} />
+            <RibbonButton icon={FolderPlus} label={text.newFolder} onClick={onNewFolder ?? notifyUnavailable} />
           </RibbonGroup>
           <RibbonGroup label={ko ? '저장 및 정보' : 'Save & info'}>
             <RibbonButton icon={Save} label={text.saveAs} disabled={!hasActiveImage} onClick={notifyUnavailable} />
@@ -442,7 +452,8 @@ export function Ribbon({
           <RibbonGroup label={text.groups.changes}>
             <RibbonButton icon={SlidersHorizontal} label={text.batchEdit} locked={edition !== 'pro'} onClick={() => runProFeature('batch-edit')} />
             <RibbonButton icon={FileOutput} label={text.convert} locked={edition !== 'pro'} onClick={() => runProFeature('batch-edit')} />
-            <RibbonButton icon={FolderUp} label={text.move} disabled={selectedCount === 0} onClick={notifyUnavailable} />
+            <RibbonButton icon={Copy} label={text.copyToFolder} disabled={selectedCount === 0} onClick={onCopyToFolder ?? notifyUnavailable} compact />
+            <RibbonButton icon={FolderUp} label={text.move} disabled={selectedCount === 0} onClick={onMoveToFolder ?? notifyUnavailable} />
           </RibbonGroup>
           <RibbonGroup label={text.groups.export}>
             <RibbonButton icon={Monitor} label={text.capture} locked={edition !== 'pro'} onClick={() => runProFeature('capture')} />
@@ -451,7 +462,7 @@ export function Ribbon({
           <RibbonGroup label={text.groups.organize}>
             <RibbonButton icon={Tags} label={text.metadata} disabled={selectedCount === 0} onClick={notifyUnavailable} />
             <RibbonButton icon={Search} label={text.duplicates} locked={edition !== 'pro'} onClick={() => runProFeature('duplicate-search')} />
-            <RibbonButton icon={Star} label={ko ? '즐겨찾기' : 'Favorites'} disabled={selectedCount === 0} onClick={notifyUnavailable} />
+            <RibbonButton icon={Star} label={ko ? '즐겨찾기' : 'Favorites'} disabled={selectedCount === 0} onClick={onToggleFavorite ?? notifyUnavailable} />
           </RibbonGroup>
         </>
       );
@@ -475,7 +486,7 @@ export function Ribbon({
     <section className="shrink-0 border-b border-gray-700 bg-gray-900/95 text-gray-200 shadow-sm" aria-label={ko ? '리본 도구 모음' : 'Ribbon toolbar'}>
       <div className="flex h-8 items-center gap-1 border-b border-gray-700/80 bg-gray-950/70 px-2" aria-label={text.groups.quick}>
         <QuickAction icon={FolderOpen} label={text.openFolder} onClick={onOpenFolder} />
-        <QuickAction icon={FolderPlus} label={text.newFolder} onClick={notifyUnavailable} />
+        <QuickAction icon={FolderPlus} label={text.newFolder} onClick={onNewFolder ?? notifyUnavailable} />
         <QuickAction icon={Save} label={text.saveAs} onClick={hasActiveImage ? notifyUnavailable : notifyImageRequired} />
         <QuickAction icon={Printer} label={text.print} onClick={hasActiveImage ? notifyUnavailable : notifyImageRequired} />
         <div className="mx-1 h-4 w-px bg-gray-700" />
@@ -512,6 +523,14 @@ export function Ribbon({
       <div className="flex min-h-[92px] items-stretch gap-1 overflow-x-auto border-t border-gray-800 px-3 py-2" role="tabpanel">
         {renderTabContent()}
       </div>
+      {proDialogFeature && edition !== 'pro' && (
+        <ProUpgradeDialog
+          language={language}
+          feature={proDialogFeature}
+          onClose={() => setProDialogFeature(null)}
+          onUpgrade={() => onNotify?.(ko ? 'Pro 전환 절차는 라이선스 모듈 연결 후 제공됩니다.' : 'The Pro conversion flow will be available with the licensing module.')}
+        />
+      )}
     </section>
   );
 }

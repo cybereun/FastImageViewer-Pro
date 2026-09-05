@@ -179,6 +179,23 @@ export function App() {
     });
   }, [updatePreferences]);
 
+  const handleNewFolder = useCallback(async () => {
+    if (!selectedFolder) {
+      setNotice(preferences.language === 'ko' ? '새 폴더를 만들 폴더를 먼저 선택하세요.' : 'Select a folder before creating a new folder.');
+      return;
+    }
+    const suggestedName = preferences.language === 'ko' ? '새 폴더' : 'New folder';
+    const directoryName = window.prompt(preferences.language === 'ko' ? '새 폴더 이름' : 'New folder name', suggestedName)?.trim();
+    if (!directoryName) return;
+    try {
+      await window.electron.createDirectory(selectedFolder, directoryName);
+      await refreshSelectedFolder();
+      setNotice(preferences.language === 'ko' ? `폴더 '${directoryName}'을 만들었습니다.` : `Created folder '${directoryName}'.`);
+    } catch (createError) {
+      setNotice(createError instanceof Error ? createError.message : (preferences.language === 'ko' ? '새 폴더를 만들지 못했습니다.' : 'Unable to create the folder.'));
+    }
+  }, [preferences.language, refreshSelectedFolder, selectedFolder]);
+
   const handleImageDropToFolder = useCallback(
     async ({ imagePaths, targetFolderPath, move }: { imagePaths: string[]; targetFolderPath: string; move: boolean }) => {
       const result = move
@@ -387,6 +404,7 @@ export function App() {
               onSelectionChange={handleSelectionChange}
               onOpenFolder={() => void openDirectory()}
               onOpenFiles={() => void openFiles()}
+              onNewFolder={() => void handleNewFolder()}
               onRefresh={() => void refreshSelectedFolder()}
               onSettings={() => setSettingsOpen(true)}
               onAbout={() => setAboutOpen(true)}

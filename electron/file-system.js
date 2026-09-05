@@ -93,6 +93,16 @@ async function ensureDirectory(dirPath) {
     return target;
 }
 
+async function createDirectory(parentPath, directoryName) {
+    const parent = await ensureDirectory(parentPath);
+    const sanitized = sanitizeFileName(directoryName);
+    if (!sanitized) throw new Error('Enter a valid folder name.');
+    const destination = path.join(parent, sanitized);
+    if (fs.existsSync(destination)) throw new Error('A folder with the same name already exists.');
+    await fs.promises.mkdir(destination);
+    return { path: destination, name: sanitized };
+}
+
 function getDisplayName(dirPath) {
     const resolved = path.resolve(dirPath);
     const driveMatch = resolved.match(/^([A-Za-z]:)\\?$/);
@@ -341,6 +351,7 @@ module.exports = {
     getDisplayName,
     readDirectory,
     readImageFiles,
+    createDirectory,
     copyImageFile,
     moveImageFile,
     renameImageFile,

@@ -8,6 +8,7 @@ const {
     isSupportedImagePath,
     readDirectory,
     readImageFiles,
+    createDirectory,
     getDisplayName,
     copyImageFile,
     moveImageFile,
@@ -208,6 +209,7 @@ ipcMain.handle('dialog:openImageFiles', async () => {
 });
 
 ipcMain.handle('fs:readDirectory', async (_event, dirPath) => readDirectory(dirPath));
+ipcMain.handle('fs:createDirectory', async (_event, parentPath, directoryName) => createDirectory(parentPath, directoryName));
 ipcMain.handle('fs:getThumbnail', async (_event, filePath, size) => getThumbnailDataUrl(filePath, size));
 ipcMain.handle('fs:copyImageFile', async (_event, sourcePath, targetFolderPath) => copyImageFile(sourcePath, targetFolderPath));
 ipcMain.handle('fs:moveImageFile', async (_event, sourcePath, targetFolderPath) => moveImageFile(sourcePath, targetFolderPath));

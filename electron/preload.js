@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld('electron', {
     openDirectory: () => ipcRenderer.invoke('dialog:openDirectory'),
     chooseDirectory: () => ipcRenderer.invoke('dialog:chooseDirectory'),
     readDirectory: (path) => ipcRenderer.invoke('fs:readDirectory', path),
+    createDirectory: (parentPath, directoryName) => ipcRenderer.invoke('fs:createDirectory', parentPath, directoryName),
     getInitialRoots: () => ipcRenderer.invoke('fs:getInitialRoots'),
     toLocalUrl: (filePath) => `local:///${encodeURIComponent(filePath)}`,
     getThumbnailUrl: (filePath, size) => ipcRenderer.invoke('fs:getThumbnail', filePath, size),
