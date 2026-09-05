@@ -23,6 +23,7 @@ const { loadPreferences, savePreferences } = require('./preferences');
 const { createUpdateManager } = require('./update-service');
 const { detectEdition } = require('./edition');
 const { mergeStorageRoot, normalizeStorageRoot } = require('./storage');
+const { getCaptureSources, captureSourceRegionToClipboard } = require('./capture');
 
 const execFileAsync = promisify(execFile);
 
@@ -210,6 +211,28 @@ ipcMain.handle('dialog:openImageFiles', async () => {
 
 ipcMain.handle('fs:readDirectory', async (_event, dirPath) => readDirectory(dirPath));
 ipcMain.handle('fs:createDirectory', async (_event, parentPath, directoryName) => createDirectory(parentPath, directoryName));
+ipcMain.handle('capture:getSources', async () => getCaptureSources());
+ipcMain.handle('capture:copyRegion', async (_event, sourceId, region) => {
+    // Do not include FastImage's capture dialog in an entire-screen capture.
+    // Window captures remain visible so a user can intentionally capture this
+    // app window when it is selected as the source.
+    const hideForScreenCapture = typeof sourceId === 'string'
+        && sourceId.startsWith('screen:')
+        && mainWindow
+        && !mainWindow.isDestroyed();
+    if (hideForScreenCapture) {
+        mainWindow.hide();
+        await new Promise((resolve) => setTimeout(resolve, 120));
+    }
+    try {
+        return await captureSourceRegionToClipboard(sourceId, region);
+    } finally {
+        if (hideForScreenCapture && mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.show();
+            mainWindow.focus();
+        }
+    }
+});
 ipcMain.handle('fs:getThumbnail', async (_event, filePath, size) => getThumbnailDataUrl(filePath, size));
 ipcMain.handle('fs:copyImageFile', async (_event, sourcePath, targetFolderPath) => copyImageFile(sourcePath, targetFolderPath));
 ipcMain.handle('fs:moveImageFile', async (_event, sourcePath, targetFolderPath) => moveImageFile(sourcePath, targetFolderPath));

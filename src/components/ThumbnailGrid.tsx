@@ -11,6 +11,7 @@ import type { Language } from '../i18n';
 import { t } from '../i18n';
 import { BUILD_EDITION } from '../application/edition';
 import { Ribbon, type RibbonProFeature } from './Ribbon';
+import { ScreenCaptureDialog } from './ScreenCaptureDialog';
 
 export interface SelectionSummary {
   count: number;
@@ -339,6 +340,7 @@ export function ThumbnailGrid({
   const [renameDialog, setRenameDialog] = useState<RenameDialogState | null>(null);
   const [batchRenameOpen, setBatchRenameOpen] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState<DeleteDialogState | null>(null);
+  const [captureOpen, setCaptureOpen] = useState(false);
   const [clipboard, setClipboard] = useState<ClipboardState | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -787,6 +789,10 @@ export function ThumbnailGrid({
   }, [selectedImages.length, showStatus]);
 
   const handleProFeature = useCallback((feature: RibbonProFeature) => {
+    if (BUILD_EDITION === 'pro' && feature === 'capture') {
+      setCaptureOpen(true);
+      return;
+    }
     const labels: Record<RibbonProFeature, string> = language === 'ko'
       ? {
           capture: '화면 캡처는 Pro 전용 기능입니다. 도움말의 Pro로 전환에서 라이선스를 확인하세요.',
@@ -1463,6 +1469,16 @@ export function ThumbnailGrid({
             </div>
           </div>
         </div>
+      )}
+
+      {captureOpen && BUILD_EDITION === 'pro' && (
+        <ScreenCaptureDialog
+          language={language}
+          onClose={() => setCaptureOpen(false)}
+          onCaptured={(result) => showStatus(language === 'ko'
+            ? `캡처 완료 · ${result.width} × ${result.height}`
+            : `Capture copied · ${result.width} × ${result.height}`)}
+        />
       )}
     </div>
   );

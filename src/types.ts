@@ -165,6 +165,31 @@ export interface BatchRenameRequest {
   nextName: string;
 }
 
+export interface CaptureSource {
+  id: string;
+  name: string;
+  type: 'screen' | 'window';
+  displayId: string;
+  thumbnailUrl: string;
+  appIconUrl: string | null;
+  width: number;
+  height: number;
+}
+
+/** A capture rectangle expressed as normalized values between 0 and 1. */
+export interface CaptureRegion {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface CaptureResult {
+  width: number;
+  height: number;
+  bytes: number;
+}
+
 declare global {
   interface Window {
     electron: {
@@ -172,6 +197,8 @@ declare global {
       chooseDirectory: () => Promise<{ path: string; name: string } | null>;
       readDirectory: (path: string) => Promise<DirectoryContent>;
       createDirectory: (parentPath: string, directoryName: string) => Promise<{ path: string; name: string }>;
+      getCaptureSources: () => Promise<CaptureSource[]>;
+      captureRegionToClipboard: (sourceId: string, region?: CaptureRegion | null) => Promise<CaptureResult>;
       getInitialRoots: () => Promise<StorageRoot[]>;
       toLocalUrl: (filePath: string) => string;
       getThumbnailUrl: (filePath: string, size?: number) => Promise<string>;
