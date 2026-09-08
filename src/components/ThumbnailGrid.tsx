@@ -580,7 +580,7 @@ const DETAILS_GRID_COLUMNS = 'grid-cols-[minmax(240px,1fr)_110px_minmax(140px,20
 function DetailsListHeader({ language }: { language: Language }) {
   return (
     <div className={cn(
-      'sticky top-0 z-10 grid min-w-[720px] items-center gap-3 border-b border-gray-700 bg-gray-900 px-2 py-1 text-xs font-medium text-gray-300',
+      'sticky top-0 z-10 col-span-full grid min-w-[720px] items-center gap-3 border-b border-gray-700 bg-gray-900 px-2 py-1 text-xs font-medium text-gray-300 shadow-sm',
       DETAILS_GRID_COLUMNS
     )}>
       <span>{language === 'ko' ? '이름' : 'Name'}</span>
@@ -2157,7 +2157,8 @@ export function ThumbnailGrid({
             }
           }}
           className={cn(
-            'flex-1 content-start overflow-auto p-3 auto-rows-min grid gap-2 outline-none',
+            'flex-1 content-start overflow-auto px-3 pb-3 auto-rows-min grid gap-2 outline-none',
+            viewSize !== 'small' && 'pt-3',
             gridCols[viewSize],
             (viewSize === 'small' || viewSize === 'medium') && 'gap-0.5',
             gridFocused && 'ring-inset ring-2 ring-blue-500/40'
