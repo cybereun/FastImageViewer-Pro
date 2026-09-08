@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
-import { FileImage, Grid3X3, ArrowUpDown, Search, Image as ImageIcon, Star, FolderOpen, FolderUp, RefreshCw } from 'lucide-react';
+import { FileImage, Grid3X3, ArrowUpDown, Search, Image as ImageIcon, Star, FolderOpen, FolderUp, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { BatchOperationResult, BatchRenameRequest, ImageFile, ImageMetadata, SortDirection, SortMode, ThumbnailSize, ViewSize } from '../types';
 import { cn } from '../utils/cn';
 import { IMAGE_DRAG_MIME } from '../constants/drag';
@@ -906,6 +906,40 @@ function FilmstripView({
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState(false);
   const showParentFolder = Boolean(getParentFolderPath(currentFolderPath)) && Boolean(onNavigateUp);
+  const stripRef = useRef<HTMLDivElement | null>(null);
+  const [stripScrollState, setStripScrollState] = useState({ hasOverflow: false, canScrollLeft: false, canScrollRight: false });
+
+  const updateStripScrollState = useCallback(() => {
+    const strip = stripRef.current;
+    if (!strip) return;
+    const maxScrollLeft = Math.max(0, strip.scrollWidth - strip.clientWidth);
+    setStripScrollState({
+      hasOverflow: maxScrollLeft > 2,
+      canScrollLeft: strip.scrollLeft > 2,
+      canScrollRight: strip.scrollLeft < maxScrollLeft - 2,
+    });
+  }, []);
+
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip) return;
+    updateStripScrollState();
+    strip.addEventListener('scroll', updateStripScrollState, { passive: true });
+    window.addEventListener('resize', updateStripScrollState);
+    return () => {
+      strip.removeEventListener('scroll', updateStripScrollState);
+      window.removeEventListener('resize', updateStripScrollState);
+    };
+  }, [images.length, showParentFolder, updateStripScrollState]);
+
+  const scrollStrip = useCallback((direction: -1 | 1) => {
+    const strip = stripRef.current;
+    if (!strip) return;
+    strip.scrollBy({
+      left: direction * Math.max(240, Math.round(strip.clientWidth * 0.75)),
+      behavior: 'smooth',
+    });
+  }, []);
 
   useEffect(() => {
     setLoaded(false);
@@ -968,7 +1002,8 @@ function FilmstripView({
       </div>
 
       <div className="shrink-0 border-t border-gray-700 bg-gray-900 px-2 py-2">
-        <div className="flex items-stretch gap-2 overflow-x-auto pb-1">
+        <div className="group relative">
+          <div ref={stripRef} className="flex items-stretch gap-2 overflow-x-auto pb-1">
           {showParentFolder && (
             <div className="w-48 shrink-0">
               <ParentFolderItem onClick={() => onNavigateUp?.()} language={language} disabled={busy} />
@@ -993,6 +1028,31 @@ function FilmstripView({
               />
             </div>
           ))}
+          </div>
+          {stripScrollState.hasOverflow && (
+            <>
+              <button
+                type="button"
+                aria-label={language === 'ko' ? '필름 스트립 왼쪽으로 이동' : 'Scroll filmstrip left'}
+                title={language === 'ko' ? '왼쪽으로 이동' : 'Scroll left'}
+                disabled={!stripScrollState.canScrollLeft}
+                onClick={() => scrollStrip(-1)}
+                className="pointer-events-none absolute left-1 top-1/2 z-10 flex h-10 w-8 -translate-y-1/2 items-center justify-center rounded-md border border-gray-600 bg-gray-950/85 text-gray-100 opacity-0 shadow-lg transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 disabled:cursor-default disabled:text-gray-600"
+              >
+                <ChevronLeft size={22} strokeWidth={2.5} />
+              </button>
+              <button
+                type="button"
+                aria-label={language === 'ko' ? '필름 스트립 오른쪽으로 이동' : 'Scroll filmstrip right'}
+                title={language === 'ko' ? '오른쪽으로 이동' : 'Scroll right'}
+                disabled={!stripScrollState.canScrollRight}
+                onClick={() => scrollStrip(1)}
+                className="pointer-events-none absolute right-1 top-1/2 z-10 flex h-10 w-8 -translate-y-1/2 items-center justify-center rounded-md border border-gray-600 bg-gray-950/85 text-gray-100 opacity-0 shadow-lg transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100 disabled:cursor-default disabled:text-gray-600"
+              >
+                <ChevronRight size={22} strokeWidth={2.5} />
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
