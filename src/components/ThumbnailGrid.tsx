@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { FileImage, Grid3X3, ArrowUpDown, Search, Image as ImageIcon, Star, FolderOpen, FolderUp, RefreshCw } from 'lucide-react';
-import type { BatchOperationResult, BatchRenameRequest, ImageFile, ImageMetadata, SortDirection, SortMode, ViewSize } from '../types';
+import type { BatchOperationResult, BatchRenameRequest, ImageFile, ImageMetadata, SortDirection, SortMode, ThumbnailSize, ViewSize } from '../types';
 import { cn } from '../utils/cn';
 import { IMAGE_DRAG_MIME } from '../constants/drag';
 import { filterAndSortImages, getImageMetadata } from '../domain/image';
@@ -47,6 +47,7 @@ interface ThumbnailGridProps {
   confirmDelete: boolean;
   viewPreferences?: {
     viewSize: ViewSize;
+    thumbnailSize: ThumbnailSize;
     sortMode: SortMode;
     sortDirection: SortDirection;
   };
@@ -75,6 +76,7 @@ interface ThumbnailGridProps {
 
 interface ViewPreferences {
   viewSize: ViewSize;
+  thumbnailSize: ThumbnailSize;
   sortMode: SortMode;
   sortDirection: SortDirection;
 }
@@ -155,6 +157,66 @@ function requestThumbnail(image: ImageFile): Promise<string> {
     });
   thumbnailRequests.set(key, request);
   return request;
+}
+
+function ImagePreview({
+  image,
+  className,
+  onImageLoad,
+}: {
+  image: ImageFile;
+  className: string;
+  onImageLoad?: (image: ImageFile, width: number, height: number) => void;
+}) {
+  const [source, setSource] = useState<string | null>(image.thumbnailUrl ?? image.url);
+  const [failed, setFailed] = useState(false);
+  const generatedThumbnail = image.source !== 'import' && Boolean(image.path) && !image.thumbnailUrl;
+
+  useEffect(() => {
+    let active = true;
+    setSource(image.thumbnailUrl ?? image.url);
+    setFailed(false);
+    if (!generatedThumbnail) return () => undefined;
+
+    void requestThumbnail(image)
+      .then((url) => {
+        if (active) setSource(url);
+      })
+      .catch(() => {
+        if (active) setSource(image.url);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [generatedThumbnail, image.lastModified, image.path, image.thumbnailUrl, image.url]);
+
+  if (!source || failed) {
+    return <FileImage aria-hidden="true" className="text-gray-300" />;
+  }
+
+  return (
+    <img
+      src={source}
+      alt={image.name}
+      className={cn('h-full w-full object-contain', className)}
+      loading="lazy"
+      decoding="async"
+      onLoad={(event) => {
+        const { naturalWidth, naturalHeight } = event.currentTarget;
+        if ((!image.width || !image.height) && naturalWidth > 0 && naturalHeight > 0) {
+          onImageLoad?.(image, naturalWidth, naturalHeight);
+        }
+      }}
+      onError={() => {
+        if (generatedThumbnail && source !== image.url) {
+          setSource(image.url);
+          return;
+        }
+        setFailed(true);
+      }}
+    />
+  );
 }
 
 function isEditableElement(target: EventTarget | null): boolean {
@@ -381,6 +443,7 @@ function LargeIconItem({
   dimmedForCut,
   disabled,
   language,
+  thumbnailSize,
   onClick,
   onDoubleClick,
   onContextMenu,
@@ -394,6 +457,7 @@ function LargeIconItem({
   dimmedForCut: boolean;
   disabled: boolean;
   language: Language;
+  thumbnailSize: ThumbnailSize;
   onClick: (e: React.MouseEvent, image: ImageFile, index: number) => void;
   onDoubleClick: (index: number) => void;
   onContextMenu: (e: React.MouseEvent, image: ImageFile) => void;
@@ -401,6 +465,11 @@ function LargeIconItem({
   onImageLoad?: (image: ImageFile, width: number, height: number) => void;
 }) {
   const typeLabel = getImageTypeLabel(image);
+  const previewSizeClasses: Record<ThumbnailSize, string> = {
+    small: 'h-14 w-14',
+    medium: 'h-20 w-20',
+    large: 'h-28 w-28',
+  };
   return (
     <button
       type="button"
@@ -419,24 +488,13 @@ function LargeIconItem({
       )}
       title={language === 'ko' ? '클릭하여 선택 · 두 번 클릭하여 열기' : 'Click to select. Double-click to open.'}
     >
-      <div className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded border border-gray-400 bg-gray-100">
-        <FileImage size={52} strokeWidth={1.25} className="text-gray-300" />
+      <div className={cn('relative flex shrink-0 items-center justify-center overflow-hidden rounded border border-gray-400 bg-gray-100', previewSizeClasses[thumbnailSize])}>
+        <ImagePreview image={image} className="bg-gray-100" onImageLoad={onImageLoad} />
         <span className="absolute bottom-1 rounded-sm bg-emerald-500 px-1 text-[10px] font-bold leading-4 text-white shadow">
           {typeLabel}
         </span>
         {getImageMetadata(image).favorite && (
           <Star size={13} fill="currentColor" className="absolute right-1 top-1 text-amber-500 drop-shadow" />
-        )}
-        {(!image.width || !image.height) && (
-          <img
-            src={image.url}
-            alt=""
-            className="pointer-events-none absolute h-px w-px opacity-0"
-            onLoad={(event) => {
-              const { naturalWidth, naturalHeight } = event.currentTarget;
-              if (naturalWidth > 0 && naturalHeight > 0) onImageLoad?.(image, naturalWidth, naturalHeight);
-            }}
-          />
         )}
       </div>
       <div className="min-w-0 flex-1 pt-0.5">
@@ -458,6 +516,7 @@ function SimpleListItem({
   dimmedForCut,
   disabled,
   language,
+  thumbnailSize,
   onClick,
   onDoubleClick,
   onContextMenu,
@@ -471,6 +530,7 @@ function SimpleListItem({
   dimmedForCut: boolean;
   disabled: boolean;
   language: Language;
+  thumbnailSize: ThumbnailSize;
   onClick: (e: React.MouseEvent, image: ImageFile, index: number) => void;
   onDoubleClick: (index: number) => void;
   onContextMenu: (e: React.MouseEvent, image: ImageFile) => void;
@@ -478,6 +538,11 @@ function SimpleListItem({
   onImageLoad?: (image: ImageFile, width: number, height: number) => void;
 }) {
   const typeLabel = getImageTypeLabel(image);
+  const previewSizeClasses: Record<ThumbnailSize, string> = {
+    small: 'h-7 w-7',
+    medium: 'h-9 w-9',
+    large: 'h-12 w-12',
+  };
   return (
     <button
       type="button"
@@ -496,24 +561,13 @@ function SimpleListItem({
       )}
       title={language === 'ko' ? '클릭하여 선택 · 두 번 클릭하여 열기' : 'Click to select. Double-click to open.'}
     >
-      <div className="relative flex h-7 w-7 shrink-0 items-center justify-center">
-        <FileImage size={25} strokeWidth={1.25} className="text-gray-300" />
+      <div className={cn('relative flex shrink-0 items-center justify-center overflow-hidden', previewSizeClasses[thumbnailSize])}>
+        <ImagePreview image={image} className="" onImageLoad={onImageLoad} />
         <span className="absolute bottom-0 rounded-sm bg-emerald-500 px-0.5 text-[7px] font-bold leading-[10px] text-white shadow">
           {typeLabel}
         </span>
         {getImageMetadata(image).favorite && (
           <Star size={10} fill="currentColor" className="absolute right-0 top-0 text-amber-500 drop-shadow" />
-        )}
-        {(!image.width || !image.height) && (
-          <img
-            src={image.url}
-            alt=""
-            className="pointer-events-none absolute h-px w-px opacity-0"
-            onLoad={(event) => {
-              const { naturalWidth, naturalHeight } = event.currentTarget;
-              if (naturalWidth > 0 && naturalHeight > 0) onImageLoad?.(image, naturalWidth, naturalHeight);
-            }}
-          />
         )}
       </div>
       <p className="min-w-0 flex-1 truncate text-sm text-gray-300">{image.name}</p>
@@ -579,6 +633,7 @@ function DetailsListItem({
   dimmedForCut,
   disabled,
   language,
+  thumbnailSize,
   onClick,
   onDoubleClick,
   onContextMenu,
@@ -592,6 +647,7 @@ function DetailsListItem({
   dimmedForCut: boolean;
   disabled: boolean;
   language: Language;
+  thumbnailSize: ThumbnailSize;
   onClick: (e: React.MouseEvent, image: ImageFile, index: number) => void;
   onDoubleClick: (index: number) => void;
   onContextMenu: (e: React.MouseEvent, image: ImageFile) => void;
@@ -599,6 +655,11 @@ function DetailsListItem({
   onImageLoad?: (image: ImageFile, width: number, height: number) => void;
 }) {
   const typeLabel = getImageTypeLabel(image);
+  const previewSizeClasses: Record<ThumbnailSize, string> = {
+    small: 'h-7 w-7',
+    medium: 'h-9 w-9',
+    large: 'h-12 w-12',
+  };
   return (
     <button
       type="button"
@@ -619,24 +680,13 @@ function DetailsListItem({
       title={language === 'ko' ? '클릭하여 선택 · 두 번 클릭하여 열기' : 'Click to select. Double-click to open.'}
     >
       <span className="flex min-w-0 items-center gap-2">
-        <span className="relative flex h-7 w-7 shrink-0 items-center justify-center">
-          <FileImage size={25} strokeWidth={1.25} className="text-gray-300" />
+        <span className={cn('relative flex shrink-0 items-center justify-center overflow-hidden', previewSizeClasses[thumbnailSize])}>
+          <ImagePreview image={image} className="" onImageLoad={onImageLoad} />
           <span className="absolute bottom-0 rounded-sm bg-emerald-500 px-0.5 text-[7px] font-bold leading-[10px] text-white shadow">
             {typeLabel}
           </span>
           {getImageMetadata(image).favorite && (
             <Star size={10} fill="currentColor" className="absolute right-0 top-0 text-amber-500 drop-shadow" />
-          )}
-          {(!image.width || !image.height) && (
-            <img
-              src={image.url}
-              alt=""
-              className="pointer-events-none absolute h-px w-px opacity-0"
-              onLoad={(event) => {
-                const { naturalWidth, naturalHeight } = event.currentTarget;
-                if (naturalWidth > 0 && naturalHeight > 0) onImageLoad?.(image, naturalWidth, naturalHeight);
-              }}
-            />
           )}
         </span>
         <span className="min-w-0 truncate text-sm text-gray-300">{image.name}</span>
@@ -658,6 +708,7 @@ function ThumbnailItem({
   dimmedForCut,
   disabled,
   viewSize,
+  thumbnailSize,
   onClick,
   onDoubleClick,
   onContextMenu,
@@ -671,6 +722,7 @@ function ThumbnailItem({
   dimmedForCut: boolean;
   disabled: boolean;
   viewSize: ViewSize;
+  thumbnailSize: ThumbnailSize;
   onClick: (e: React.MouseEvent, image: ImageFile, index: number) => void;
   onDoubleClick: (index: number) => void;
   onContextMenu: (e: React.MouseEvent, image: ImageFile) => void;
@@ -733,15 +785,10 @@ function ThumbnailItem({
     ? (thumbnailFailed ? image.url : thumbnailUrl)
     : (image.thumbnailUrl ?? image.url);
 
-  const sizeClasses = {
+  const thumbnailSizeClasses: Record<ThumbnailSize, string> = {
     small: 'h-28',
     medium: 'h-44',
-    // Preview uses a wide, Explorer-style tile.  Keep one consistent canvas
-    // height so portrait and landscape photos can be compared in one row,
-    // while object-contain below preserves each image's natural ratio.
-    large: 'h-48',
-    'large-icons': 'h-20',
-    filmstrip: 'h-48',
+    large: 'h-64',
   };
 
   return (
@@ -761,7 +808,7 @@ function ThumbnailItem({
       )}
       title="Click to select. Double-click to open."
     >
-      <div ref={thumbnailRef} className={cn('relative w-full overflow-hidden bg-gray-900', sizeClasses[viewSize])}>
+      <div ref={thumbnailRef} className={cn('relative w-full overflow-hidden bg-gray-900', thumbnailSizeClasses[thumbnailSize], viewSize === 'filmstrip' && 'h-48')}>
         {!loaded && !error && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-gray-600 border-t-blue-400" />
@@ -819,6 +866,7 @@ interface FilmstripViewProps {
   activeIndex: number;
   currentFolderPath: string | null;
   language: Language;
+  thumbnailSize: ThumbnailSize;
   busy: boolean;
   selectedIds: Set<string>;
   activeId: string | null;
@@ -840,6 +888,7 @@ function FilmstripView({
   activeIndex,
   currentFolderPath,
   language,
+  thumbnailSize,
   busy,
   selectedIds,
   activeId,
@@ -934,7 +983,8 @@ function FilmstripView({
                 selected={selectedIds.has(image.id)}
                 dimmedForCut={cutIdSet.has(image.path)}
                 disabled={busy}
-                viewSize="large"
+                viewSize="filmstrip"
+                thumbnailSize={thumbnailSize}
                 onClick={onSelectClick}
                 onDoubleClick={onDoubleClick}
                 onContextMenu={onContextMenu}
@@ -988,6 +1038,7 @@ export function ThumbnailGrid({
   const [sortMode, setSortMode] = useState<SortMode>(viewPreferences?.sortMode ?? 'name');
   const [sortDirection, setSortDirection] = useState<SortDirection>(viewPreferences?.sortDirection ?? 'asc');
   const [viewSize, setViewSize] = useState<ViewSize>(viewPreferences?.viewSize ?? 'medium');
+  const [thumbnailSize, setThumbnailSize] = useState<ThumbnailSize>(viewPreferences?.thumbnailSize ?? 'medium');
   const [formatFilter, setFormatFilter] = useState<FormatFilter>('all');
   const [sizeFilter, setSizeFilter] = useState<SizeFilter>('all');
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
@@ -1202,13 +1253,19 @@ export function ThumbnailGrid({
   useEffect(() => {
     if (!viewPreferences) return;
     setViewSize(viewPreferences.viewSize);
+    setThumbnailSize(viewPreferences.thumbnailSize);
     setSortMode(viewPreferences.sortMode);
     setSortDirection(viewPreferences.sortDirection);
-  }, [viewPreferences?.sortDirection, viewPreferences?.sortMode, viewPreferences?.viewSize]);
+  }, [viewPreferences?.sortDirection, viewPreferences?.sortMode, viewPreferences?.thumbnailSize, viewPreferences?.viewSize]);
 
   const changeViewSize = useCallback((size: ViewSize) => {
     setViewSize(size);
     onViewPreferencesChange?.({ viewSize: size });
+  }, [onViewPreferencesChange]);
+
+  const changeThumbnailSize = useCallback((size: ThumbnailSize) => {
+    setThumbnailSize(size);
+    onViewPreferencesChange?.({ thumbnailSize: size });
   }, [onViewPreferencesChange]);
 
   const changeSortMode = useCallback(() => {
@@ -1980,14 +2037,16 @@ export function ThumbnailGrid({
         </div>
 
         <div className="flex items-center gap-1 rounded-md border border-gray-700 bg-gray-800 p-0.5">
-          {(['small', 'medium', 'large'] as ViewSize[]).map((size) => (
+          {(['small', 'medium', 'large'] as ThumbnailSize[]).map((size) => (
             <button
               key={size}
-              onClick={() => changeViewSize(size)}
+              type="button"
+              onClick={() => changeThumbnailSize(size)}
               className={cn(
                 'rounded px-2 py-1 text-xs transition-colors',
-                viewSize === size ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
+                thumbnailSize === size ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-white'
               )}
+              title={language === 'ko' ? `썸네일 크기 ${size === 'small' ? '작게' : size === 'medium' ? '중간' : '크게'}` : `Thumbnail size: ${size}`}
             >
               {size === 'small' ? 'S' : size === 'medium' ? 'M' : 'L'}
             </button>
@@ -2069,6 +2128,7 @@ export function ThumbnailGrid({
             activeIndex={activeIndex}
             currentFolderPath={currentFolderPath}
             language={language}
+            thumbnailSize={thumbnailSize}
             busy={busy}
             selectedIds={selectedIds}
             activeId={activeId}
@@ -2132,6 +2192,7 @@ export function ThumbnailGrid({
                 dimmedForCut={cutIdSet.has(image.path)}
                 disabled={busy}
                 language={language}
+                thumbnailSize={thumbnailSize}
                 onClick={handleSelectClick}
                 onDoubleClick={openImageByIndex}
                 onContextMenu={handleContextMenu}
@@ -2148,6 +2209,7 @@ export function ThumbnailGrid({
                 dimmedForCut={cutIdSet.has(image.path)}
                 disabled={busy}
                 language={language}
+                thumbnailSize={thumbnailSize}
                 onClick={handleSelectClick}
                 onDoubleClick={openImageByIndex}
                 onContextMenu={handleContextMenu}
@@ -2164,6 +2226,7 @@ export function ThumbnailGrid({
                 dimmedForCut={cutIdSet.has(image.path)}
                 disabled={busy}
                 language={language}
+                thumbnailSize={thumbnailSize}
                 onClick={handleSelectClick}
                 onDoubleClick={openImageByIndex}
                 onContextMenu={handleContextMenu}
@@ -2180,6 +2243,7 @@ export function ThumbnailGrid({
                 dimmedForCut={cutIdSet.has(image.path)}
                 disabled={busy}
                 viewSize={viewSize}
+                thumbnailSize={thumbnailSize}
                 onClick={handleSelectClick}
                 onDoubleClick={openImageByIndex}
                 onContextMenu={handleContextMenu}

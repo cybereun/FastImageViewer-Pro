@@ -6,6 +6,7 @@ const DEFAULT_PREFERENCES = {
     theme: 'dark',
     sidebarOpen: true,
     viewSize: 'medium',
+    thumbnailSize: 'medium',
     sortMode: 'name',
     sortDirection: 'asc',
     wheelNavigation: true,
@@ -28,6 +29,9 @@ function normalizePreferences(value) {
     if (typeof source.sidebarOpen === 'boolean') result.sidebarOpen = source.sidebarOpen;
     if (source.viewSize === 'small' || source.viewSize === 'medium' || source.viewSize === 'large' || source.viewSize === 'large-icons' || source.viewSize === 'filmstrip') {
         result.viewSize = source.viewSize;
+    }
+    if (source.thumbnailSize === 'small' || source.thumbnailSize === 'medium' || source.thumbnailSize === 'large') {
+        result.thumbnailSize = source.thumbnailSize;
     }
     if (source.sortMode === 'name' || source.sortMode === 'type' || source.sortMode === 'size' || source.sortMode === 'date' || source.sortMode === 'rating') {
         result.sortMode = source.sortMode;

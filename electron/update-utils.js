@@ -1,6 +1,8 @@
 const SEMVER_PATTERN = /^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?$/;
 const PORTABLE_ASSET_PATTERN = /^FastImage-[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?-Windows-Portable\.exe$/;
 const INSTALLER_ASSET_PATTERN = /^FastImage-[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?-Windows-Setup\.exe$/;
+const PRO_PORTABLE_ASSET_PATTERN = /^FastImage-Pro-[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?-Windows-Portable\.exe$/;
+const PRO_INSTALLER_ASSET_PATTERN = /^FastImage-Pro-[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?-Windows-Setup\.exe$/;
 const ASSET_PATTERN = PORTABLE_ASSET_PATTERN;
 
 function parseVersion(value) {
@@ -59,14 +61,22 @@ function compareVersions(left, right) {
     return comparePrerelease(leftVersion.prerelease, rightVersion.prerelease);
 }
 
-function getPortableAssetName(version) {
-    const normalized = normalizeVersion(version);
-    return normalized ? `FastImage-${normalized}-Windows-Portable.exe` : null;
+function normalizeEdition(edition) {
+    return String(edition ?? '').trim().toLowerCase() === 'pro' ? 'pro' : 'community';
 }
 
-function getInstallerAssetName(version) {
+function getAssetPrefix(edition) {
+    return normalizeEdition(edition) === 'pro' ? 'FastImage-Pro' : 'FastImage';
+}
+
+function getPortableAssetName(version, edition = 'community') {
     const normalized = normalizeVersion(version);
-    return normalized ? `FastImage-${normalized}-Windows-Setup.exe` : null;
+    return normalized ? `${getAssetPrefix(edition)}-${normalized}-Windows-Portable.exe` : null;
+}
+
+function getInstallerAssetName(version, edition = 'community') {
+    const normalized = normalizeVersion(version);
+    return normalized ? `${getAssetPrefix(edition)}-${normalized}-Windows-Setup.exe` : null;
 }
 
 function parseSha256Digest(value) {
@@ -75,12 +85,15 @@ function parseSha256Digest(value) {
     return match ? match[1].toLowerCase() : null;
 }
 
-function selectReleaseAsset(release, version, distribution = 'portable') {
+function selectReleaseAsset(release, version, distribution = 'portable', edition = 'community') {
     if (!release || !Array.isArray(release.assets)) return null;
     const expectedName = distribution === 'installer'
-        ? getInstallerAssetName(version)
-        : getPortableAssetName(version);
-    const assetPattern = distribution === 'installer' ? INSTALLER_ASSET_PATTERN : PORTABLE_ASSET_PATTERN;
+        ? getInstallerAssetName(version, edition)
+        : getPortableAssetName(version, edition);
+    const normalizedEdition = normalizeEdition(edition);
+    const assetPattern = distribution === 'installer'
+        ? (normalizedEdition === 'pro' ? PRO_INSTALLER_ASSET_PATTERN : INSTALLER_ASSET_PATTERN)
+        : (normalizedEdition === 'pro' ? PRO_PORTABLE_ASSET_PATTERN : PORTABLE_ASSET_PATTERN);
     if (!expectedName) return null;
     return release.assets.find((asset) => (
         asset
@@ -90,13 +103,13 @@ function selectReleaseAsset(release, version, distribution = 'portable') {
     )) ?? null;
 }
 
-function buildUpdateInfo(release, currentVersion, distribution = 'portable') {
+function buildUpdateInfo(release, currentVersion, distribution = 'portable', edition = 'community') {
     if (!release || typeof release !== 'object') return null;
     const version = normalizeVersion(release.tag_name);
     const comparison = compareVersions(version, currentVersion);
     if (!version || comparison === null || comparison <= 0) return null;
 
-    const asset = selectReleaseAsset(release, version, distribution);
+    const asset = selectReleaseAsset(release, version, distribution, edition);
     if (!asset) return null;
 
     return {
@@ -116,6 +129,8 @@ function buildUpdateInfo(release, currentVersion, distribution = 'portable') {
 module.exports = {
     ASSET_PATTERN,
     INSTALLER_ASSET_PATTERN,
+    PRO_INSTALLER_ASSET_PATTERN,
+    PRO_PORTABLE_ASSET_PATTERN,
     buildUpdateInfo,
     compareVersions,
     getInstallerAssetName,

@@ -12,6 +12,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   theme: 'dark',
   sidebarOpen: true,
   viewSize: 'medium',
+  thumbnailSize: 'medium',
   sortMode: 'name',
   sortDirection: 'asc',
   wheelNavigation: true,

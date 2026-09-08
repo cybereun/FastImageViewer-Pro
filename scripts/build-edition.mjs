@@ -16,6 +16,7 @@ const packageJson = JSON.parse(readFileSync(path.join(root, 'package.json'), 'ut
 const baseBuild = packageJson.build ?? {};
 const isPro = edition === 'pro';
 const productName = isPro ? 'FastImage Pro' : 'FastImage';
+const artifactPrefix = isPro ? 'FastImage-Pro' : 'FastImage';
 const appId = isPro ? 'com.antigravity.fastimage.pro' : 'com.antigravity.fastimage';
 const outputDirectory = isPro ? 'dist-electron-pro' : 'dist-electron';
 
@@ -34,9 +35,14 @@ const builderConfig = {
     ...(baseBuild.extraMetadata ?? {}),
     edition,
   },
+  win: {
+    ...(baseBuild.win ?? {}),
+    artifactName: `${artifactPrefix}-\${version}-Windows-Portable.\${ext}`,
+  },
   nsis: {
     ...(baseBuild.nsis ?? {}),
     shortcutName: productName,
+    artifactName: `${artifactPrefix}-\${version}-Windows-Setup.\${ext}`,
   },
 };
 

@@ -275,7 +275,7 @@ function createUpdateManager({ app, edition = 'community', onUpdateAvailable, on
 
         try {
             const release = await requestRelease(releaseApiUrl);
-            const update = buildUpdateInfo(release, currentVersion, getDistribution());
+            const update = buildUpdateInfo(release, currentVersion, getDistribution(), appEdition);
             if (!update) {
                 latestUpdate = null;
                 return { status: 'up-to-date', currentVersion };

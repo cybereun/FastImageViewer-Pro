@@ -435,6 +435,7 @@ export function App() {
 
   const viewPreferences = {
     viewSize: preferences.viewSize,
+    thumbnailSize: preferences.thumbnailSize,
     sortMode: preferences.sortMode,
     sortDirection: preferences.sortDirection,
   };
@@ -461,7 +462,7 @@ export function App() {
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
         aria-label={preferences.language === 'ko' ? '빠른 실행 및 창 제어' : 'Quick access and window controls'}
       >
-        <div className="flex shrink-0 items-center gap-0.5" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        <div className="ml-auto flex shrink-0 items-center gap-0.5" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <ChromeAction
             icon={FolderOpen}
             label={t(preferences.language, 'openFolder')}
@@ -514,7 +515,9 @@ export function App() {
             label={t(preferences.language, 'about')}
             onClick={() => setAboutOpen(true)}
           />
-          <div className="mx-1 h-4 w-px bg-gray-700" />
+        </div>
+
+        <div className="ml-1 flex shrink-0 items-center gap-0.5 border-l border-gray-700 pl-1" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
           <ChromeAction icon={Minus} label={preferences.language === 'ko' ? '최소화' : 'Minimize'} onClick={() => window.electron.minimizeWindow()} />
           <ChromeAction
             icon={isMaximized ? SquareStack : Square}

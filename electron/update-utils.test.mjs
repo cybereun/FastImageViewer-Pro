@@ -64,4 +64,17 @@ describe('update version rules', () => {
       downloadUrl: 'https://example.com/setup.exe',
     });
   });
+
+  it('selects Pro assets without accepting Community assets', () => {
+    const release = {
+      tag_name: 'v2.3.3',
+      assets: [
+        { name: 'FastImage-2.3.3-Windows-Portable.exe', browser_download_url: 'https://example.com/community.exe', size: 42 },
+        { name: 'FastImage-Pro-2.3.3-Windows-Portable.exe', browser_download_url: 'https://example.com/pro.exe', size: 43 },
+      ],
+    };
+
+    expect(getPortableAssetName('2.3.3', 'pro')).toBe('FastImage-Pro-2.3.3-Windows-Portable.exe');
+    expect(selectReleaseAsset(release, '2.3.3', 'portable', 'pro')?.name).toBe('FastImage-Pro-2.3.3-Windows-Portable.exe');
+  });
 });

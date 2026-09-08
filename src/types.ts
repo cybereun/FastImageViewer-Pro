@@ -98,6 +98,7 @@ export interface CropRect {
 }
 
 export type ViewSize = 'small' | 'medium' | 'large' | 'large-icons' | 'filmstrip';
+export type ThumbnailSize = 'small' | 'medium' | 'large';
 export type SortMode = 'name' | 'type' | 'size' | 'date' | 'rating';
 export type SortDirection = 'asc' | 'desc';
 
@@ -106,6 +107,7 @@ export interface Preferences {
   theme: 'dark' | 'light';
   sidebarOpen: boolean;
   viewSize: ViewSize;
+  thumbnailSize: ThumbnailSize;
   sortMode: SortMode;
   sortDirection: SortDirection;
   wheelNavigation: boolean;
