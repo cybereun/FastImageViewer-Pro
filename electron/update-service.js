@@ -6,6 +6,8 @@ const { createUpdateRunner } = require('./update-runner');
 const {
     buildUpdateInfo,
     compareVersions,
+    getInstallerAssetName,
+    getPortableAssetName,
     parseSha256Digest,
 } = require('./update-utils');
 const { getEditionConfig, normalizeEdition } = require('./edition');
@@ -366,8 +368,10 @@ function createUpdateManager({ app, edition = 'community', onUpdateAvailable, on
         if (manifest.edition && normalizeEdition(manifest.edition) !== appEdition) {
             return { status: 'error', message: 'This download belongs to a different FastImage edition. Please download the update again.' };
         }
-        const expectedAsset = `FastImage-${manifest.version}-Windows-${distribution === 'portable' ? 'Portable' : 'Setup'}.exe`;
-        if (manifest.assetName !== expectedAsset || (manifest.distribution && manifest.distribution !== distribution)) {
+        const expectedAsset = distribution === 'portable'
+            ? getPortableAssetName(manifest.version, appEdition)
+            : getInstallerAssetName(manifest.version, appEdition);
+        if (!expectedAsset || manifest.assetName !== expectedAsset || (manifest.distribution && manifest.distribution !== distribution)) {
             return { status: 'error', message: 'This download belongs to a different installation type. Please download the update again.' };
         }
         const targetPath = getPortableExecutablePath();
