@@ -75,132 +75,235 @@ body {
 
 .fast-image-app[data-theme="light"] {
   color-scheme: light;
-  color: #1e293b;
-  background: #f8fafc;
+  color: #172033;
+  background: #eef2f6;
+  --light-canvas: #eef2f6;
+  --light-surface: #ffffff;
+  --light-surface-soft: #f7f9fc;
+  --light-control: #f1f5f9;
+  --light-control-hover: #e6f3f1;
+  --light-border: #d6dee8;
+  --light-border-strong: #c1ccd9;
+  --light-text: #172033;
+  --light-muted: #64748b;
+  --light-subtle: #94a3b8;
+  --light-accent: #0f766e;
+  --light-accent-hover: #0d9488;
+  --light-accent-soft: #dff4ef;
 }
 
-/*
- * The UI was originally authored with dark-only utility classes.  Keep the
- * markup shared between themes, but give the light theme its own neutral
- * surfaces and a calm teal accent.  Attribute selectors also cover Tailwind's
- * opacity variants (for example bg-gray-900/80) that a class-exact selector
- * cannot match.
- */
+/* Shared dark utility classes are remapped here so both builds keep the same
+ * visual language without duplicating theme-specific markup. */
 .fast-image-app[data-theme="light"] [class*="bg-gray-950"],
+.fast-image-app[data-theme="light"] [class*="bg-gray-950\/"],
 .fast-image-app[data-theme="light"] [class*="bg-[#0d0d0d]"],
 .fast-image-app[data-theme="light"] [class*="bg-[#0e0e0e]"],
 .fast-image-app[data-theme="light"] [class*="bg-[#101010]"],
 .fast-image-app[data-theme="light"] [class*="bg-[#111]"] {
-  background-color: #f8fafc !important;
+  background-color: var(--light-canvas) !important;
 }
 
 .fast-image-app[data-theme="light"] [class*="bg-gray-900"],
 .fast-image-app[data-theme="light"] [class*="bg-[#121212]"],
 .fast-image-app[data-theme="light"] [class*="bg-[#171717]"],
 .fast-image-app[data-theme="light"] [class*="bg-[#1a1a1a]"],
+.fast-image-app[data-theme="light"] [class*="bg-[#1b1b1b]"],
 .fast-image-app[data-theme="light"] [class*="bg-[#1e1e1e]"],
 .fast-image-app[data-theme="light"] [class*="bg-[#1f1f1f]"],
 .fast-image-app[data-theme="light"] [class*="bg-[#252526]"] {
-  background-color: #ffffff !important;
+  background-color: var(--light-surface) !important;
 }
 
 .fast-image-app[data-theme="light"] [class*="bg-gray-800"],
-.fast-image-app[data-theme="light"] [class*="bg-gray-700"] {
-  background-color: #eef2f7 !important;
+.fast-image-app[data-theme="light"] [class*="bg-gray-800\/"],
+.fast-image-app[data-theme="light"] [class*="bg-gray-700"],
+.fast-image-app[data-theme="light"] [class*="bg-gray-700\/"],
+.fast-image-app[data-theme="light"] [class*="bg-gray-600"] {
+  background-color: var(--light-control) !important;
 }
 
-.fast-image-app[data-theme="light"] [class*="hover:bg-gray-800"],
-.fast-image-app[data-theme="light"] [class*="hover:bg-gray-700"],
+.fast-image-app[data-theme="light"] [class*="hover:bg-gray-800"]:hover,
+.fast-image-app[data-theme="light"] [class*="hover:bg-gray-700"]:hover,
 .fast-image-app[data-theme="light"] [class*="hover:bg-gray-600"]:hover {
-  background-color: #e2e8f0 !important;
+  background-color: var(--light-control-hover) !important;
 }
 
 .fast-image-app[data-theme="light"] [class*="text-white"],
+.fast-image-app[data-theme="light"] [class*="text-gray-100"],
 .fast-image-app[data-theme="light"] [class*="text-gray-200"],
 .fast-image-app[data-theme="light"] [class*="text-gray-300"] {
-  color: #1e293b !important;
+  color: var(--light-text) !important;
 }
 
 .fast-image-app[data-theme="light"] [class*="text-gray-400"],
 .fast-image-app[data-theme="light"] [class*="text-gray-500"] {
-  color: #64748b !important;
+  color: var(--light-muted) !important;
 }
 
-.fast-image-app[data-theme="light"] [class*="text-gray-600"] {
+.fast-image-app[data-theme="light"] [class*="text-gray-600"],
+.fast-image-app[data-theme="light"] [class*="text-gray-700"] {
   color: #475569 !important;
 }
 
-/* Replace the saturated blue controls with an accessible teal accent. */
+.fast-image-app[data-theme="light"] [class*="placeholder:text-gray-"]::placeholder {
+  color: var(--light-subtle) !important;
+}
+
+/* Teal is the single light-theme accent; selected controls use its soft tint. */
 .fast-image-app[data-theme="light"] [class*="bg-blue-600"],
-.fast-image-app[data-theme="light"] [class*="bg-blue-700"] {
-  background-color: #0f766e !important;
-}
-
+.fast-image-app[data-theme="light"] [class*="bg-blue-700"],
 .fast-image-app[data-theme="light"] [class*="bg-blue-500"] {
-  background-color: #0f766e !important;
+  background-color: var(--light-accent) !important;
 }
 
-.fast-image-app[data-theme="light"] [class*="bg-blue-950"] {
-  background-color: #ccfbf1 !important;
-}
-
+.fast-image-app[data-theme="light"] [class*="bg-blue-900"],
+.fast-image-app[data-theme="light"] [class*="bg-blue-950"],
 .fast-image-app[data-theme="light"] [class*="bg-blue-500\/15"],
+.fast-image-app[data-theme="light"] [class*="bg-blue-500\/25"],
 .fast-image-app[data-theme="light"] [class*="bg-blue-950\/20"],
+.fast-image-app[data-theme="light"] [class*="bg-blue-950\/30"],
 .fast-image-app[data-theme="light"] [class*="bg-blue-950\/40"] {
-  background-color: #ccfbf1 !important;
+  background-color: var(--light-accent-soft) !important;
+}
+
+.fast-image-app[data-theme="light"] [class*="hover:bg-blue-"]:hover {
+  background-color: var(--light-accent-hover) !important;
 }
 
 .fast-image-app[data-theme="light"] [class*="text-blue-"] {
-  color: #115e59 !important;
+  color: var(--light-accent) !important;
 }
 
+.fast-image-app[data-theme="light"] [class*="bg-teal-600\/25"] {
+  background-color: var(--light-accent-soft) !important;
+}
+
+.fast-image-app[data-theme="light"] [class*="hover:bg-teal-700\/25"]:hover {
+  background-color: #ccebe6 !important;
+}
+
+.fast-image-app[data-theme="light"] [class*="text-teal-"] {
+  color: var(--light-accent) !important;
+}
+
+/* Semantic feedback remains recognizable on the porcelain canvas. */
+.fast-image-app[data-theme="light"] [class*="bg-amber-950"],
+.fast-image-app[data-theme="light"] [class*="bg-amber-900\/"],
+.fast-image-app[data-theme="light"] [class*="bg-amber-500\/15"],
+.fast-image-app[data-theme="light"] [class*="bg-yellow-950"],
+.fast-image-app[data-theme="light"] [class*="bg-yellow-900\/"],
+.fast-image-app[data-theme="light"] [class*="bg-yellow-500\/15"] {
+  background-color: #fff7e6 !important;
+}
+
+.fast-image-app[data-theme="light"] [class*="text-amber-"],
+.fast-image-app[data-theme="light"] [class*="text-yellow-"] {
+  color: #9a6700 !important;
+}
+
+.fast-image-app[data-theme="light"] [class*="bg-red-950"],
+.fast-image-app[data-theme="light"] [class*="bg-red-900\/"],
+.fast-image-app[data-theme="light"] [class*="bg-red-500\/15"] {
+  background-color: #fff1f2 !important;
+}
+
+.fast-image-app[data-theme="light"] [class*="text-red-100"],
+.fast-image-app[data-theme="light"] [class*="text-red-200"],
+.fast-image-app[data-theme="light"] [class*="text-red-300"],
+.fast-image-app[data-theme="light"] [class*="text-red-400"] {
+  color: #be123c !important;
+}
+
+.fast-image-app[data-theme="light"] [class*="bg-emerald-950"],
+.fast-image-app[data-theme="light"] [class*="bg-emerald-900\/"],
+.fast-image-app[data-theme="light"] [class*="bg-emerald-500\/15"] {
+  background-color: #ecfdf5 !important;
+}
+
+.fast-image-app[data-theme="light"] [class*="text-emerald-"] {
+  color: #047857 !important;
+}
+
+/* Keep labels white on saturated actions and preserve the dark image viewer. */
 .fast-image-app[data-theme="light"] [class*="bg-blue-"][class*="text-white"],
-.fast-image-app[data-theme="light"] [class*="bg-red-"][class*="text-white"] {
+.fast-image-app[data-theme="light"] [class*="bg-red-"][class*="text-white"],
+.fast-image-app[data-theme="light"] [class*="bg-teal-"][class*="text-white"] {
   color: #ffffff !important;
 }
 
-/* The image viewer intentionally stays dark so photographs keep a neutral
- * surround; restore its light-on-dark controls after the app-wide text map. */
 .fast-image-app[data-theme="light"] [class*="bg-black"] [class*="text-white"],
 .fast-image-app[data-theme="light"] [class*="bg-black"] [class*="text-gray-200"],
 .fast-image-app[data-theme="light"] [class*="bg-black"] [class*="text-gray-300"] {
   color: #ffffff !important;
 }
 
-.fast-image-app[data-theme="light"] [class*="border-blue-"] {
-  border-color: #5eead4 !important;
-}
-
-.fast-image-app[data-theme="light"] [class*="ring-blue-"] {
-  --tw-ring-color: #14b8a6 !important;
+.fast-image-app[data-theme="light"] [class*="border-blue-"],
+.fast-image-app[data-theme="light"] [class*="border-teal-"] {
+  border-color: #5bbab0 !important;
 }
 
 .fast-image-app[data-theme="light"] [class*="border-gray-700"],
 .fast-image-app[data-theme="light"] [class*="border-gray-800"],
 .fast-image-app[data-theme="light"] [class*="border-gray-600"] {
-  border-color: #cbd5e1 !important;
+  border-color: var(--light-border) !important;
+}
+
+.fast-image-app[data-theme="light"] [class*="border-gray-400"],
+.fast-image-app[data-theme="light"] [class*="border-gray-500"] {
+  border-color: var(--light-border-strong) !important;
+}
+
+.fast-image-app[data-theme="light"] [class*="ring-blue-"],
+.fast-image-app[data-theme="light"] [class*="ring-teal-"] {
+  --tw-ring-color: #14b8a6 !important;
+}
+
+.fast-image-app[data-theme="light"] input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([class*="bg-transparent"]),
+.fast-image-app[data-theme="light"] select,
+.fast-image-app[data-theme="light"] textarea {
+  color: var(--light-text);
+  background-color: var(--light-surface);
+  border-color: var(--light-border-strong);
+}
+
+.fast-image-app[data-theme="light"] select option {
+  color: var(--light-text);
+  background: var(--light-surface);
+}
+
+.fast-image-app[data-theme="light"] input[type="checkbox"],
+.fast-image-app[data-theme="light"] input[type="radio"] {
+  accent-color: var(--light-accent);
 }
 
 .fast-image-app[data-theme="light"] input[type="range"] {
-  background: #cbd5e1;
+  background: var(--light-border-strong);
 }
 
 .fast-image-app[data-theme="light"] input[type="range"]::-webkit-slider-thumb,
 .fast-image-app[data-theme="light"] input[type="range"]::-moz-range-thumb {
-  background: #0f766e;
+  background: var(--light-accent);
 }
 
-/* Dialogs contain several legacy text-white utility classes.  Give every
- * light-theme popup a readable dark foreground, including controls whose
- * text color is set explicitly by a child utility class. */
+.fast-image-app[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #b8c5d3;
+}
+
+.fast-image-app[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Dialogs use the same surface hierarchy as the main window. */
 .fast-image-app[data-theme="light"] [role="dialog"] {
-  color: #0f172a !important;
+  color: var(--light-text) !important;
+  background-color: var(--light-surface) !important;
 }
 
 .fast-image-app[data-theme="light"] [role="dialog"] [class*="text-white"],
+.fast-image-app[data-theme="light"] [role="dialog"] [class*="text-gray-100"],
 .fast-image-app[data-theme="light"] [role="dialog"] [class*="text-gray-200"],
 .fast-image-app[data-theme="light"] [role="dialog"] [class*="text-gray-300"] {
-  color: #0f172a !important;
+  color: var(--light-text) !important;
 }
 
 .fast-image-app[data-theme="light"] [role="dialog"] [class*="text-gray-400"],
@@ -211,19 +314,9 @@ body {
 
 .fast-image-app[data-theme="light"] [role="dialog"] [class*="bg-gray-800"],
 .fast-image-app[data-theme="light"] [role="dialog"] [class*="bg-gray-700"] {
-  background-color: #f1f5f9 !important;
+  background-color: var(--light-surface-soft) !important;
 }
 
-.fast-image-app[data-theme="light"] [role="dialog"] [class*="bg-gray-900"],
-.fast-image-app[data-theme="light"] [role="dialog"] [class*="bg-[#0e0e0e]"],
-.fast-image-app[data-theme="light"] [role="dialog"] [class*="bg-[#101010]"],
-.fast-image-app[data-theme="light"] [role="dialog"] [class*="bg-[#171717]"],
-.fast-image-app[data-theme="light"] [role="dialog"] [class*="bg-[#1a1a1a]"],
-.fast-image-app[data-theme="light"] [role="dialog"] [class*="bg-[#1f1f1f]"] {
-  background-color: #ffffff !important;
-}
-
-/* Preserve white labels on the teal primary action and dark viewer controls. */
 .fast-image-app[data-theme="light"] [role="dialog"] [class*="bg-blue-"][class*="text-white"],
 .fast-image-app[data-theme="light"] [role="dialog"] [class*="bg-red-"][class*="text-white"] {
   color: #ffffff !important;
